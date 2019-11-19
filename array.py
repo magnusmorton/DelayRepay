@@ -16,30 +16,28 @@ def cast(func):
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __new__(cls, shape, dtype='float64', buffer=None, offset=0,
-                strides=None, order=None, parent=None):
+                strides=None, order=None, parent=None, ops=None):
         self = super(DelayArray, cls).__new__(cls)
         if buffer is not None:
             self._ndarray = buffer
-        else if parent is None :
+        elif ops is None:
             self._ndarray = np.ndarray(shape, dtype, buffer, offset, strides, order)
         self.shape = shape
         self.dtype = dtype
         self.parent = parent
+        self.ops = ops
         return self
 
-
-    def __init__(self, *args, **kwargs):
-        self.ops = []
-        
     def __repr__(self):
-        return str(self.ops)
+        return "delayarr: " + str(self.ops)
 
 
     def child(self, ops):
-        self.ops = ops
-        return DelayArray(self.shape, parent)
+        return DelayArray(self.shape, ops=ops)
     
-        
+    def walk(self):
+        walker = NumpyWalker()
+        return walker.walk(self)
 
     def __array__(self):
         return self._ndarray
@@ -47,8 +45,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         print(ufunc)
         print(method)
-        self.ops.append((ufunc, inputs, kwargs))
-        return self
+        return self.child((ufunc, inputs, kwargs))
 
 
 
@@ -59,7 +56,25 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
 array = cast(np.array)
 
+class NumpyWalker:
+    def walk(self, arr):
+        if arr.ops is None:
+            print("NONE")
+            print(arr._ndarray)
+            return arr._ndarray
+        else:
+            return arr.ops[0](self.walk(arr.ops[1][0]), self.walk(arr.ops[1][0]))
+
+class StringWalker:
+    def walk(self, arr):
+        if arr.ops is None:
+            return str(arr._ndarray)
+        else:
+            
+
 if __name__ == "__main__":
+    walker = NumpyWalker()
     arr = array([1,2,3])
-    print(arr)
-    arr * arr
+    res = (arr @ arr) + arr
+    print(res)
+    print(walker.walk(res))
