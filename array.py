@@ -22,6 +22,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             self._ndarray = buffer
         elif ops is None:
             self._ndarray = np.ndarray(shape, dtype, buffer, offset, strides, order)
+        else:
+            # do type inference
+            pass
         self.shape = shape
         self.dtype = dtype
         self.parent = parent
@@ -29,11 +32,11 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return self
 
     def __repr__(self):
-        return "delayarr: " + str(self.ops)
+        return "delayarr: " + str(self.dtype)
 
 
     def child(self, ops):
-        return DelayArray(self.shape, ops=ops)
+        return DelayArray(self.shape,  ops=ops)
     
     def walk(self):
         walker = NumpyWalker()
@@ -45,6 +48,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         print(ufunc)
         print(method)
+        print(inputs)
         return self.child((ufunc, inputs, kwargs))
 
 
@@ -70,7 +74,12 @@ class StringWalker:
         if arr.ops is None:
             return str(arr._ndarray)
         else:
-            
+            pass
+
+
+class LiftFunction:
+    def __init__(self, body, *types):
+        self.types = types
 
 if __name__ == "__main__":
     walker = NumpyWalker()
