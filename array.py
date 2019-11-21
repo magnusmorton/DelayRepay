@@ -14,6 +14,34 @@ def cast(func):
         return arr
     return wrapper
 
+def calc_shape(func, shape1, shape2):
+
+    if len(shape1) == 1:
+        shape1 = (1,) + shape1
+    if len(shape2) == 1:
+        shape2 = (1,) + shape2
+    if func == 'multiply':
+        return (shape1[0], shape2[1])
+    if func == 'add':
+        return shape1
+    if func == 'dot':
+        if shape1[0] == 1:
+            return (1,)
+        else:
+            return (shape1[0], shape2[1])
+
+def calc_type(func, type1, type2):
+    if 'float64' in (type1,type2):
+        return 'float64'
+    elif 'float32' in (type1, type2):
+        return 'float32'
+    elif 'int64' in (type1, type2):
+        return 'int64'
+    else:
+        return type1
+
+    
+
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __new__(cls, shape, dtype='float64', buffer=None, offset=0,
                 strides=None, order=None, parent=None, ops=None):
