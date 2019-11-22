@@ -104,10 +104,14 @@ class StringWalker:
         else:
             pass
 
+class LiftWalker:
+    def walk(self, arr):
+        pass
 
 class LiftFunction:
     def __init__(self, body, *types):
         self.types = types
+    
 
 if __name__ == "__main__":
     walker = NumpyWalker()
