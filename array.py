@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.lib.mixins
-import copy
+
 def cast(func):
     print("casting")
     def wrapper(*args, **kwargs):
@@ -108,10 +108,41 @@ class LiftWalker:
     def walk(self, arr):
         pass
 
+    def emit_mm(self, arr):
+        return
+
+class Compose:
+    pass
+
+class Map:
+    pass
+
+class MapWrg(Map):
+    pass
+
+class Join:
+    pass
+
+class MapLcl(Map):
+    pass
+
+class MapSeq(Map):
+    pass
+
+class Split:
+    pass
+
+class Zip:
+    pass
+
 class LiftFunction:
     def __init__(self, body, *types):
         self.types = types
-    
+
+
+class VecAdd:
+    def __init__(self):
+        pass
 
 if __name__ == "__main__":
     walker = NumpyWalker()
