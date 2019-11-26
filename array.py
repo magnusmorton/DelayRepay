@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.lib.mixins
+from dataclasses import dataclass
 
 def cast(func):
     print("casting")
@@ -111,34 +112,97 @@ class LiftWalker:
     def emit_mm(self, arr):
         return
 
-class Compose:
-    pass
+@dataclass
+class LiftNode:
+    '''A lift IR node '''
 
-class Map:
-    pass
+@dataclass
+class Atom(LiftNode):
+    '''Atoms'''
 
+@dataclass
+class Seq(LiftNode):
+    '''Sequence type'''
+
+@dataclass
+class Var(Atom):
+    '''Not functions/classes'''
+    val: str
+
+@dataclass
+class Number(Atom):
+    '''Numbers'''
+    val: float
+
+@dataclass
+class String(Atom):
+    '''Strings'''
+    val: str
+
+@dataclass
+class Unary(LiftNode):
+    '''Unary function'''
+    arg: LiftNode
+
+@dataclass
+class Binary(LiftNode):
+    '''Binary Function'''
+    left: LiftNode
+    right: LiftNode
+
+
+@dataclass
+class Compose(Binary):
+    '''Composition function'''
+
+@dataclass
+class Apply(Binary):
+    '''Function application ($)'''
+
+@dataclass
+class Map(Unary):
+    '''Map base class'''
+
+@dataclass
 class MapWrg(Map):
-    pass
+    '''Map function over workgroups?'''
 
-class Join:
-    pass
+@dataclass
+class Join(LiftNode):
+    '''Join. Not sure what it does. Barrier? '''
 
+@dataclass
 class MapLcl(Map):
-    pass
+    '''Map fuction over work items?'''
 
+@dataclass
 class MapSeq(Map):
-    pass
+    '''Map sequentially'''
 
-class Split:
-    pass
+@dataclass
+class Split(Unary):
+    '''Split data'''
 
-class Zip:
-    pass
+@dataclass
+class Zip(Binary):
+    '''Zip'''
+
+@dataclass
+class Array(LiftNode):
+    '''Lift Array type'''
+
+@dataclass
+class UserFun(LiftNode):
+    '''User Functions for OpenCL'''
+    name: String
+    args: Array
+    body: String
+    arg_type: LiftNode
+    ret_type: LiftNode
 
 class LiftFunction:
     def __init__(self, body, *types):
         self.types = types
-
 
 class VecAdd:
     def __init__(self):
