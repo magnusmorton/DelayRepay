@@ -1,6 +1,9 @@
+'''Delay array and related stuff'''
+
+from dataclasses import dataclass
+from typing import List, Any
 import numpy as np
 import numpy.lib.mixins
-from dataclasses import dataclass
 
 def cast(func):
     print("casting")
@@ -89,14 +92,29 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
 array = cast(np.array)
 
+
+def vector_add():
+    fun = UserFun(String("add"), Array([String("x"), String("y")], String("{ return x+y; }"), Seq([Float(), Float()]), Float()))
+    size = SizeVar(String(name="N"))
+
+    return LiftFunction(
+        [ArrayTypeWSWC(Float(), size), ArrayTypeWSWC(Float(), size)],
+        Lambda([Var("left"), Var("right")],
+               Join().compose(MapWrg(
+                   Join().compose(MapLcl(
+                       MapSeq(fun))).compose(Split(Number(4)))
+                   )).compose(Split(Number(1024))).apply(Zip(Var("left"), Var("right")))))
+        
+
 class NumpyWalker:
+    '''Simply evaluates the numpy ops'''
     def walk(self, arr):
+        '''walk the array'''
         if arr.ops is None:
             print("NONE")
             print(arr._ndarray)
             return arr._ndarray
-        else:
-            return arr.ops[0](self.walk(arr.ops[1][0]), self.walk(arr.ops[1][0]))
+        return arr.ops[0](self.walk(arr.ops[1][0]), self.walk(arr.ops[1][1]))
 
 class StringWalker:
     def walk(self, arr):
@@ -116,13 +134,45 @@ class LiftWalker:
 class LiftNode:
     '''A lift IR node '''
 
+    def compose(self, other: LiftNode) -> Compose:
+        '''convenience method for composition'''
+        return Compose(self, other)
+
+    def apply(self, other: LiftNode) -> Apply:
+        '''convenience method for application'''
+        return Apply(self, other)
+
+@dataclass
+class LiftType(LiftNode):
+    '''A lift type'''
+
+@dataclass
+class SizeVar(LiftNode):
+    ''' An array sizevar'''
+    name: String
+
 @dataclass
 class Atom(LiftNode):
     '''Atoms'''
 
 @dataclass
-class Seq(LiftNode):
+class Seq(LiftType):
     '''Sequence type'''
+    types: List[LiftType]
+
+@dataclass
+class ArrayTypeWSWC(LiftType):
+    '''Funciton input array type'''
+    dtype: LiftType
+    sizevar: SizeVar
+
+@dataclass
+class Float(LiftType):
+    '''A float'''
+
+@dataclass
+class Int(LiftType):
+    '''An Int'''
 
 @dataclass
 class Var(Atom):
@@ -190,6 +240,13 @@ class Zip(Binary):
 @dataclass
 class Array(LiftNode):
     '''Lift Array type'''
+    members: List[String]
+
+@dataclass
+class Lambda(LiftNode):
+    '''A scala lambda'''
+    args: List[Var]
+    body: LiftNode
 
 @dataclass
 class UserFun(LiftNode):
@@ -197,16 +254,46 @@ class UserFun(LiftNode):
     name: String
     args: Array
     body: String
-    arg_type: LiftNode
-    ret_type: LiftNode
+    arg_type: LiftType
+    ret_type: LiftType
 
+@dataclass
 class LiftFunction:
-    def __init__(self, body, *types):
-        self.types = types
+    '''A lift fun...'''
+    types: List[LiftType]
+    body: LiftNode
 
-class VecAdd:
-    def __init__(self):
-        pass
+
+@dataclass
+class NumpyEx:
+    '''Numpy expression'''
+
+    @dataclass
+class BinaryNumpyEx(NumpyEx):
+    '''Binary numpy expression'''
+    left: NumpyEx
+    right: NumpyEx
+
+@dataclass
+class Dot(BinaryNumpyEx):
+    '''np.dot func'''
+    name: np.ufunc = np.dot
+
+@dataclass
+class Multiply(BinaryNumpyEx):
+    '''np.multiply'''
+    name = np.mulitply
+
+@dataclass
+class Add(BinaryNumpyEx):
+    '''np.add'''
+    name  = np.add
+
+@dataclass
+class NPArray(NumpyEx):
+    '''ndarray'''
+    array: np.ndarray
+    
 
 if __name__ == "__main__":
     walker = NumpyWalker()
