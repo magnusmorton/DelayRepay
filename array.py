@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from typing import List, Any
 import numpy as np
 import numpy.lib.mixins
+from num import *
 
 def cast(func):
+    '''cast to Delay array decorator'''
     print("casting")
     def wrapper(*args, **kwargs):
         print(func)
@@ -19,7 +21,7 @@ def cast(func):
     return wrapper
 
 def calc_shape(func, shape1, shape2):
-
+    
     if len(shape1) == 1:
         shape1 = (1,) + shape1
     if len(shape2) == 1:
@@ -48,15 +50,20 @@ def calc_type(func, type1, type2):
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __new__(cls, shape, dtype='float64', buffer=None, offset=0,
-                strides=None, order=None, parent=None, ops=None):
+                strides=None, order=None, parent=None, ops=None, ex=None):
         self = super(DelayArray, cls).__new__(cls)
         if buffer is not None:
             self._ndarray = buffer
+            self.ex = NPArray(buffer)
         elif ops is None:
             self._ndarray = np.ndarray(shape, dtype, buffer, offset, strides, order)
+            self.ex = NPArray(np.ndarray(shape, dtype, buffer, offset, strides, order))
+        elif ex is not None:
+            self.ex = ex
         else:
             # do type inference
             pass
+       
         self.shape = shape
         self.dtype = dtype
         self.parent = parent
@@ -64,7 +71,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return self
 
     def __repr__(self):
-        return "delayarr: " + str(self.dtype)
+        return str(self.__array__())
 
 
     def child(self, ops):
@@ -75,13 +82,17 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return walker.walk(self)
 
     def __array__(self):
-        return self._ndarray
+        return NumpyFunction(self.ex)()
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         print(ufunc)
         print(method)
         print(inputs)
-        return self.child((ufunc, inputs, kwargs))
+        if ufunc.__name__ == 'multiply':
+            print("FOO")
+        cls = func_to_numpy_ex(ufunc)
+        args = [arg_to_numpy_ex(arg) for arg in inputs]
+        return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=cls(args[0], args[1]))
 
 
 
@@ -90,20 +101,39 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return self
 
 
+
 array = cast(np.array)
 
 
-def vector_add():
-    fun = UserFun(String("add"), Array([String("x"), String("y")], String("{ return x+y; }"), Seq([Float(), Float()]), Float()))
-    size = SizeVar(String(name="N"))
+def arg_to_numpy_ex(arg:Any) -> NumpyEx:
+    from numbers import Number
+    if isinstance(arg, DelayArray):
+        return arg.ex
+    elif isinstance(arg, Number):
+        return Scalar(arg)
+    else:
+        print(arg)
+        raise NotImplementedError
 
-    return LiftFunction(
-        [ArrayTypeWSWC(Float(), size), ArrayTypeWSWC(Float(), size)],
-        Lambda([Var("left"), Var("right")],
-               Join().compose(MapWrg(
-                   Join().compose(MapLcl(
-                       MapSeq(fun))).compose(Split(Number(4)))
-                   )).compose(Split(Number(1024))).apply(Zip(Var("left"), Var("right")))))
+def func_to_numpy_ex(func):
+    return {
+        'matmul': Matmul,
+        'add': Add,
+        'multiply': Multiply
+        }[func.__name__]
+
+
+# def vector_add():
+#     fun = UserFun(String("add"), Array([String("x"), String("y")], String("{ return x+y; }"), Seq([Float(), Float()]), Float()))
+#     size = SizeVar(String(name="N"))
+
+#     return LiftFunction(
+#         [ArrayTypeWSWC(Float(), size), ArrayTypeWSWC(Float(), size)],
+#         Lambda([Var("left"), Var("right")],
+#                Join().compose(MapWrg(
+#                    Join().compose(MapLcl(
+#                        MapSeq(fun))).compose(Split(Number(4)))
+#                    )).compose(Split(Number(1024))).apply(Zip(Var("left"), Var("right")))))
         
 
 class NumpyWalker:
@@ -121,183 +151,35 @@ class StringWalker:
         if arr.ops is None:
             return str(arr._ndarray)
         else:
-            pass
+            strs = ["np." + arr.ops[0].__name__, "("]
+            for arg in arr.ops[1]:
+                strs.append(self.walk(arg))
+            strs.append(")")
+            return ''.join(strs)
 
-class LiftWalker:
-    def walk(self, arr):
-        pass
+# class LiftWalker:
+#     def walk(self, _):
+#         pass
 
-    def emit_mm(self, arr):
-        return
-
-@dataclass
-class LiftNode:
-    '''A lift IR node '''
-
-    def compose(self, other: LiftNode) -> Compose:
-        '''convenience method for composition'''
-        return Compose(self, other)
-
-    def apply(self, other: LiftNode) -> Apply:
-        '''convenience method for application'''
-        return Apply(self, other)
-
-@dataclass
-class LiftType(LiftNode):
-    '''A lift type'''
-
-@dataclass
-class SizeVar(LiftNode):
-    ''' An array sizevar'''
-    name: String
-
-@dataclass
-class Atom(LiftNode):
-    '''Atoms'''
-
-@dataclass
-class Seq(LiftType):
-    '''Sequence type'''
-    types: List[LiftType]
-
-@dataclass
-class ArrayTypeWSWC(LiftType):
-    '''Funciton input array type'''
-    dtype: LiftType
-    sizevar: SizeVar
-
-@dataclass
-class Float(LiftType):
-    '''A float'''
-
-@dataclass
-class Int(LiftType):
-    '''An Int'''
-
-@dataclass
-class Var(Atom):
-    '''Not functions/classes'''
-    val: str
-
-@dataclass
-class Number(Atom):
-    '''Numbers'''
-    val: float
-
-@dataclass
-class String(Atom):
-    '''Strings'''
-    val: str
-
-@dataclass
-class Unary(LiftNode):
-    '''Unary function'''
-    arg: LiftNode
-
-@dataclass
-class Binary(LiftNode):
-    '''Binary Function'''
-    left: LiftNode
-    right: LiftNode
+#     def emit_mm(self, _):
+#         return
 
 
-@dataclass
-class Compose(Binary):
-    '''Composition function'''
-
-@dataclass
-class Apply(Binary):
-    '''Function application ($)'''
-
-@dataclass
-class Map(Unary):
-    '''Map base class'''
-
-@dataclass
-class MapWrg(Map):
-    '''Map function over workgroups?'''
-
-@dataclass
-class Join(LiftNode):
-    '''Join. Not sure what it does. Barrier? '''
-
-@dataclass
-class MapLcl(Map):
-    '''Map fuction over work items?'''
-
-@dataclass
-class MapSeq(Map):
-    '''Map sequentially'''
-
-@dataclass
-class Split(Unary):
-    '''Split data'''
-
-@dataclass
-class Zip(Binary):
-    '''Zip'''
-
-@dataclass
-class Array(LiftNode):
-    '''Lift Array type'''
-    members: List[String]
-
-@dataclass
-class Lambda(LiftNode):
-    '''A scala lambda'''
-    args: List[Var]
-    body: LiftNode
-
-@dataclass
-class UserFun(LiftNode):
-    '''User Functions for OpenCL'''
-    name: String
-    args: Array
-    body: String
-    arg_type: LiftType
-    ret_type: LiftType
-
-@dataclass
-class LiftFunction:
-    '''A lift fun...'''
-    types: List[LiftType]
-    body: LiftNode
-
-
-@dataclass
-class NumpyEx:
-    '''Numpy expression'''
-
-    @dataclass
-class BinaryNumpyEx(NumpyEx):
-    '''Binary numpy expression'''
-    left: NumpyEx
-    right: NumpyEx
-
-@dataclass
-class Dot(BinaryNumpyEx):
-    '''np.dot func'''
-    name: np.ufunc = np.dot
-
-@dataclass
-class Multiply(BinaryNumpyEx):
-    '''np.multiply'''
-    name = np.mulitply
-
-@dataclass
-class Add(BinaryNumpyEx):
-    '''np.add'''
-    name  = np.add
-
-@dataclass
-class NPArray(NumpyEx):
-    '''ndarray'''
-    array: np.ndarray
-    
+def main():
+    ''' main method'''
+    walker: Any = NumpyWalker()
+    arr = array([1, 2, 3])
+    arr2 = array([3,4,5])
+    res = (arr @ arr) + arr2
+    print(res)
+    print(res.ex)
+    print(walker.walk(res))
+    walker = StringWalker()
+    print(walker.walk(res))
+    visitor = NumpyVarVisitor()
+    print(visitor.visit(res.ex))
+    func = NumpyFunction(res.ex)
+    print(func())
 
 if __name__ == "__main__":
-    walker = NumpyWalker()
-    arr = array([1,2,3])
-    res = (arr @ arr) + arr
-    print(res)
-    print(walker.walk(res))
+    main()
