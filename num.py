@@ -117,9 +117,12 @@ class NumpyFunction:
 
     def __call__(self):
         visitor = StringVisitor()
-        body = visitor.visit(self.body)
         exp = "lambda {}: {}".format(','.join(self.args.values()), visitor.visit(self.body))
         fun = eval(exp)
         return fun(*[arr.array for arr in self.args.keys()])
+
+    def __str__(self):
+        string = StringVisitor().visit(self.body)
+        return "def jitfunc({}):\n    {}".format(','.join(self.args.values()), string)
         
 

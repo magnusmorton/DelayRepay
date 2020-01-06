@@ -136,26 +136,15 @@ def func_to_numpy_ex(func):
 #                    )).compose(Split(Number(1024))).apply(Zip(Var("left"), Var("right")))))
         
 
-class NumpyWalker:
-    '''Simply evaluates the numpy ops'''
-    def walk(self, arr):
-        '''walk the array'''
-        if arr.ops is None:
-            print("NONE")
-            print(arr._ndarray)
-            return arr._ndarray
-        return arr.ops[0](self.walk(arr.ops[1][0]), self.walk(arr.ops[1][1]))
-
-class StringWalker:
-    def walk(self, arr):
-        if arr.ops is None:
-            return str(arr._ndarray)
-        else:
-            strs = ["np." + arr.ops[0].__name__, "("]
-            for arg in arr.ops[1]:
-                strs.append(self.walk(arg))
-            strs.append(")")
-            return ''.join(strs)
+# class NumpyWalker:
+#     '''Simply evaluates the numpy ops'''
+#     def walk(self, arr):
+#         '''walk the array'''
+#         if arr.ops is None:
+#             print("NONE")
+#             print(arr._ndarray)
+#             return arr._ndarray
+#         return arr.ops[0](self.walk(arr.ops[1][0]), self.walk(arr.ops[1][1]))
 
 # class LiftWalker:
 #     def walk(self, _):
@@ -167,18 +156,17 @@ class StringWalker:
 
 def main():
     ''' main method'''
-    walker: Any = NumpyWalker()
     arr = array([1, 2, 3])
     arr2 = array([3,4,5])
     res = (arr @ arr) + arr2
     print(res)
     print(res.ex)
-    print(walker.walk(res))
-    walker = StringWalker()
-    print(walker.walk(res))
     visitor = NumpyVarVisitor()
     print(visitor.visit(res.ex))
     func = NumpyFunction(res.ex)
+    print(func)
+    exec(str(func), globals())
+    print(jitfunc)
     print(func())
 
 if __name__ == "__main__":
