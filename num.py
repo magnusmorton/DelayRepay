@@ -1,9 +1,12 @@
 '''Numpy abstractions'''
 
+import logging
 from dataclasses import dataclass
 from numbers import Number
 from typing import List
 import numpy as np
+
+logger = logging.getLogger("delayRepay.num")
 
 @dataclass
 class NumpyEx:
@@ -67,12 +70,17 @@ class NumpyVisitor:
     '''visitor ABC'''
     def visit(self, node):
         '''generic visit'''
+
+        logger.debug("visiting {}".format(node))
         if isinstance(node, BinaryNumpyEx):
             return self.visit_binary(node)
         if isinstance(node, NPArray):
             return self.visit_array(node)
         if isinstance(node, Var):
             return self.visit_var(node)
+        if isinstance(node, Scalar):
+            return self.visit_scalar(node)
+        logger.critical("!!!!!Not Implemented!!!!!")
         return NotImplemented
 
 class NumpyVarVisitor(NumpyVisitor):
@@ -96,6 +104,9 @@ class NumpyVarVisitor(NumpyVisitor):
             self.arrays[node] = name
         return Var(name)
 
+    def visit_scalar(self, node):
+        return node
+
 class StringVisitor(NumpyVisitor):
     '''returns string of numpy expression'''
 
@@ -105,6 +116,9 @@ class StringVisitor(NumpyVisitor):
 
     def visit_var(self, node: Var):
         return node.name
+
+    def visit_scalar(self, node: Scalar):
+        return node.val
 
 class NumpyFunction:
     '''complete numpy function'''
@@ -117,12 +131,17 @@ class NumpyFunction:
 
     def __call__(self):
         visitor = StringVisitor()
-        exp = "lambda {}: {}".format(','.join(self.args.values()), visitor.visit(self.body))
-        fun = eval(exp)
-        return fun(*[arr.array for arr in self.args.keys()])
+        exp = str(self)
+        args = {}
+        exec(exp, globals(), args )
+        return args['jitfunc'](*[arr.array for arr in self.args.keys()])
+
+    def _cpu(self):
+        string = StringVisitor().visit(self.body)
+        return "import numba\n@numba.jit\ndef jitfunc({}):\n    {}".format(','.join(self.args.values()), string)
+        
 
     def __str__(self):
-        string = StringVisitor().visit(self.body)
-        return "def jitfunc({}):\n    {}".format(','.join(self.args.values()), string)
+        return self._cpu()
         
 

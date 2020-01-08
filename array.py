@@ -1,5 +1,6 @@
 '''Delay array and related stuff'''
 
+import logging
 from dataclasses import dataclass
 from typing import List, Any
 import numpy as np
@@ -15,7 +16,6 @@ def cast(func):
         arr = func(*args, **kwargs)
         print(arr)
         if not isinstance(arr,DelayArray):
-            print("let's delay")
             arr = DelayArray(arr.shape, buffer=arr)
         return arr
     return wrapper
@@ -68,6 +68,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self.dtype = dtype
         self.parent = parent
         self.ops = ops
+        self._logger = logging.getLogger("delayRepay.arr")
         return self
 
     def __repr__(self):
@@ -85,11 +86,11 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return NumpyFunction(self.ex)()
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        print(ufunc)
-        print(method)
-        print(inputs)
+        self._logger.debug("func: {}".format(ufunc))
+        self._logger.debug(method)
+        self._logger.debug(inputs)
         if ufunc.__name__ == 'multiply':
-            print("FOO")
+            self._logger.debug("FOO")
         cls = func_to_numpy_ex(ufunc)
         args = [arg_to_numpy_ex(arg) for arg in inputs]
         return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=cls(args[0], args[1]))
@@ -97,7 +98,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
 
     def __array_function__(self, func, types, args, kwargs):
-        print("BAR")
+        self._logger.debug("array_function")
         return self
 
 
@@ -158,7 +159,8 @@ def main():
     ''' main method'''
     arr = array([1, 2, 3])
     arr2 = array([3,4,5])
-    res = (arr @ arr) + arr2
+    #res = (arr @ arr) + arr2
+    res = arr + 1
     print(res)
     print(res.ex)
     visitor = NumpyVarVisitor()
