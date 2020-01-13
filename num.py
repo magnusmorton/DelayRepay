@@ -67,22 +67,32 @@ class Scalar(NPAtom):
     val: Number
 
 class NumpyVisitor:
+    def __init__(self):
+        self.visits = 0
     '''visitor ABC'''
     def visit(self, node):
         '''generic visit'''
-
-        logger.debug("visiting {}".format(node))
+        self.visits += 1
+        logger.debug("visiting {}. visits: {}".format(node, self.visits))
         if isinstance(node, BinaryNumpyEx):
-            return self.visit_binary(node)
-        if isinstance(node, NPArray):
-            return self.visit_array(node)
-        if isinstance(node, Var):
-            return self.visit_var(node)
-        if isinstance(node, Scalar):
-            return self.visit_scalar(node)
-        logger.critical("!!!!!Not Implemented!!!!!")
-        return NotImplemented
+            ret =  self.visit_binary(node)
+        elif isinstance(node, NPArray):
+            ret = self.visit_array(node)
+        elif isinstance(node, Var):
+            ret =  self.visit_var(node)
+        elif isinstance(node, Scalar):
+            ret =  self.visit_scalar(node)
+        else:
+            logger.critical("!!!!!Not Implemented!!!!!")
+            ret =  NotImplemented
+        return ret
 
+    def walk(self, tree):
+        ''' top-level walk of tree'''
+        self.visits = 0
+        logger.debug("walking from top")
+        return self.visit(tree)
+    
 class NumpyVarVisitor(NumpyVisitor):
     '''visits and returns new tree with arrays replaced with vars'''
     def __init__(self):
@@ -139,7 +149,9 @@ class NumpyFunction:
     def _cpu(self):
         string = StringVisitor().visit(self.body)
         return "import numba\n@numba.jit\ndef jitfunc({}):\n    {}".format(','.join(self.args.values()), string)
-        
+
+    def _gpu(self):
+        raise Error("GPU stuff not complete")
 
     def __str__(self):
         return self._cpu()
