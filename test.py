@@ -31,6 +31,8 @@ import cl
 trans = cl.GPUTransformer()
 res = trans.walk(res.ex)
 print(res)
+emit = cl.CLEmitter()
+print(emit.visit(res))
 # if __name__ == '__main__':
 #     # logging.basicConfig( level=logging.DEBUG)
 #     # unittest.main()
