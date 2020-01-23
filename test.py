@@ -24,15 +24,27 @@ from array import *
 #     def test_gpu_function_def(self):
 #         print(self.func._gpu)
 
-arr = array([1,2,3])
-res = arr + 1
+arr = array([1.0,2.0,3.0])
+arr = ones(50000)
+res = arr + 1.0
 import cl
+import num
 
 trans = cl.GPUTransformer()
 res = trans.walk(res.ex)
 print(res)
+print(trans.ins)
+print(trans.outs)
+
+args = cl.CLArgs(list(trans.ins.keys()) + trans.outs, ["float*", "float*"])
+
+fun = cl.CLFunction(args, "gfunc", [res])
+print(fun)
 emit = cl.CLEmitter()
-print(emit.visit(res))
+kern = emit.visit(fun)
+print(kern)
+
+print(cl.executor(kern, arr._ndarray, None))
 # if __name__ == '__main__':
 #     # logging.basicConfig( level=logging.DEBUG)
 #     # unittest.main()

@@ -97,6 +97,7 @@ class NumpyVarVisitor(NumpyVisitor):
     '''visits and returns new tree with arrays replaced with vars'''
     def __init__(self):
         self.arrays = {}
+        super(NumpyVarVisitor, self).__init__()
 
     def visit_binary(self, node):
         '''visit BinaryNumpyEx'''

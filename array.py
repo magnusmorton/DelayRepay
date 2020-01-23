@@ -105,6 +105,8 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
 array = cast(np.array)
 
+ones = cast(np.ones)
+
 
 def arg_to_numpy_ex(arg:Any) -> NumpyEx:
     from numbers import Number
