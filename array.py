@@ -6,6 +6,7 @@ from typing import List, Any
 import numpy as np
 import numpy.lib.mixins
 from num import *
+from cl import run_gpu
 
 def cast(func):
     '''cast to Delay array decorator'''
@@ -83,7 +84,8 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return walker.walk(self)
 
     def __array__(self):
-        return NumpyFunction(self.ex)()
+        # return NumpyFunction(self.ex)()
+        return run_gpu(self.ex)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         self._logger.debug("func: {}".format(ufunc))

@@ -25,26 +25,27 @@ from array import *
 #         print(self.func._gpu)
 
 arr = array([1.0,2.0,3.0])
-arr = ones(50000)
+arr = ones(5000000)
 res = arr + 1.0
 import cl
 import num
 
-trans = cl.GPUTransformer()
-res = trans.walk(res.ex)
+# trans = cl.GPUTransformer()
+# res = trans.walk(res.ex)
+# # print(res)
+# # print(trans.ins)
+# # print(trans.outs)
+
+# args = cl.CLArgs(list(trans.ins.keys()) + trans.outs, ["float*", "float*"])
+
+# fun = cl.CLFunction(args, "gfunc", [res])
+# # print(fun)
+# emit = cl.CLEmitter()
+# kern = emit.visit(fun)
+# # print(kern)
+
+# print(cl.run_gpu(res.ex))
 print(res)
-print(trans.ins)
-print(trans.outs)
-
-args = cl.CLArgs(list(trans.ins.keys()) + trans.outs, ["float*", "float*"])
-
-fun = cl.CLFunction(args, "gfunc", [res])
-print(fun)
-emit = cl.CLEmitter()
-kern = emit.visit(fun)
-print(kern)
-
-print(cl.executor(kern, arr._ndarray, None))
 # if __name__ == '__main__':
 #     # logging.basicConfig( level=logging.DEBUG)
 #     # unittest.main()

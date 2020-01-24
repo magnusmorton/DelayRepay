@@ -155,3 +155,11 @@ def executor(kernel, in_arr, out_arr):
     cl.enqueue_copy(queue, res_np, res_g)
     return res_np
     
+
+def run_gpu(numpy_ex):
+    transformer =  GPUTransformer()
+    gpu_ex = transformer.walk(numpy_ex)
+    args = CLArgs(list(transformer.ins.keys()) + transformer.outs, ["float*", "float*"])
+    func = CLFunction(args, "gfunc", [gpu_ex])
+    kernel = CLEmitter().visit(func)
+    return executor(kernel, list(transformer.ins.values())[0], None)

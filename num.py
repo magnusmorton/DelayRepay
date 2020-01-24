@@ -152,6 +152,7 @@ class NumpyFunction:
         return "import numba\n@numba.jit\ndef jitfunc({}):\n    {}".format(','.join(self.args.values()), string)
 
     def _gpu(self):
+        
         raise Error("GPU stuff not complete")
 
     def __str__(self):
