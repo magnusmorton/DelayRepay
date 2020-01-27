@@ -1,6 +1,6 @@
 import unittest
 import logging
-
+import numpy as np
 from array import *
 
 # class TestScalarAdd(unittest.TestCase):
@@ -24,9 +24,8 @@ from array import *
 #     def test_gpu_function_def(self):
 #         print(self.func._gpu)
 
-arr = array([1.0,2.0,3.0])
-arr = ones(5000000)
-res = arr + 1.0
+arr = ones(5000000).astype(np.float32)
+res = arr + 1
 import cl
 import num
 

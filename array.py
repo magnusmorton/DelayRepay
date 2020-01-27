@@ -10,12 +10,8 @@ from cl import run_gpu
 
 def cast(func):
     '''cast to Delay array decorator'''
-    print("casting")
     def wrapper(*args, **kwargs):
-        print(func)
-        print(args)
         arr = func(*args, **kwargs)
-        print(arr)
         if not isinstance(arr,DelayArray):
             arr = DelayArray(arr.shape, buffer=arr)
         return arr
@@ -50,7 +46,7 @@ def calc_type(func, type1, type2):
     
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
-    def __new__(cls, shape, dtype='float64', buffer=None, offset=0,
+    def __new__(cls, shape, dtype='float32', buffer=None, offset=0,
                 strides=None, order=None, parent=None, ops=None, ex=None):
         self = super(DelayArray, cls).__new__(cls)
         if buffer is not None:
@@ -58,7 +54,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             self.ex = NPArray(buffer)
         elif ops is None:
             self._ndarray = np.ndarray(shape, dtype, buffer, offset, strides, order)
-            self.ex = NPArray(np.ndarray(shape, dtype, buffer, offset, strides, order))
+            self.ex = NPArray(self._ndarray)
         elif ex is not None:
             self.ex = ex
         else:
@@ -103,6 +99,13 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self._logger.debug("array_function")
         return self
 
+    def astype(self, *args, **kwargs):
+        self._ndarray = self._ndarray.astype(*args, **kwargs)
+        if isinstance(self.ex, NPArray):
+            self.ex = NPArray(self._ndarray)
+        else:
+            raise Exception("Dont call astype here")
+        return self
 
 
 array = cast(np.array)
