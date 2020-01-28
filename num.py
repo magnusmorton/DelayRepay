@@ -26,25 +26,25 @@ class BinaryNumpyEx(NumpyEx):
         'multiply': '*'
         }[self.func.__name__]
     
-@dataclass
-class Dot(BinaryNumpyEx):
-    '''np.dot func'''
-    func: np.ufunc = np.dot
+# @dataclass
+# class Dot(BinaryNumpyEx):
+#     '''np.dot func'''
+#     func: np.ufunc = np.dot
 
-@dataclass
-class Multiply(BinaryNumpyEx):
-    '''np.multiply'''
-    func = np.multiply
+# @dataclass
+# class Multiply(BinaryNumpyEx):
+#     '''np.multiply'''
+#     func = np.multiply
 
-@dataclass
-class Matmul(BinaryNumpyEx):
-    '''np.matmul'''
-    func = np.matmul
+# @dataclass
+# class Matmul(BinaryNumpyEx):
+#     '''np.matmul'''
+#     func = np.matmul
 
-@dataclass
-class Add(BinaryNumpyEx):
-    '''np.add'''
-    func  = np.add
+# @dataclass
+# class Add(BinaryNumpyEx):
+#     '''np.add'''
+#     func  = np.add
 
 @dataclass
 class NPAtom(NumpyEx):
