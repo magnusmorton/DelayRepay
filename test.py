@@ -22,27 +22,15 @@ class TestElWise(unittest.TestCase):
         res = arr * 3
         npt.assert_array_almost_equal(res, np_arr * 3)
 
-# arr = ones(5000000).astype(np.float32)
-# res = arr + 1
-# import cl
-# import num
+    def test_var_add(self):
+        arr = ones(5000).astype(np.float32)
+        np_arr = np.ones(5000).astype(np.float32)
+        a = 7
+        res = a * arr
+        npt.assert_array_almost_equal(res, np_arr * 7)
+                
 
-# # trans = cl.GPUTransformer()
-# # res = trans.walk(res.ex)
-# # # print(res)
-# # # print(trans.ins)
-# # # print(trans.outs)
 
-# # args = cl.CLArgs(list(trans.ins.keys()) + trans.outs, ["float*", "float*"])
-
-# # fun = cl.CLFunction(args, "gfunc", [res])
-# # # print(fun)
-# # emit = cl.CLEmitter()
-# # kern = emit.visit(fun)
-# # # print(kern)
-
-# # print(cl.run_gpu(res.ex))
-# print(res)
 if __name__ == '__main__':
     # logging.basicConfig( level=logging.DEBUG)
     unittest.main()

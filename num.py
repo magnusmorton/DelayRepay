@@ -17,6 +17,14 @@ class BinaryNumpyEx(NumpyEx):
     '''Binary numpy expression'''
     left: NumpyEx
     right: NumpyEx
+    func: np.ufunc
+
+    def to_op(self):
+        return {
+        'matmul': '@',
+        'add': '+',
+        'multiply': '*'
+        }[self.func.__name__]
     
 @dataclass
 class Dot(BinaryNumpyEx):

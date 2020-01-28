@@ -117,9 +117,7 @@ class GPUTransformer(num.NumpyVisitor):
 
     def visit_binary(self, node):
         cur_visits = self.visits
-        if isinstance(node, num.Add):
-            op = "+"
-        ex = BinaryExpression(op, self.visit(node.left), self.visit(node.right))
+        ex = BinaryExpression(node.to_op(), self.visit(node.left), self.visit(node.right))
         if cur_visits == 1:
             ex = Assignment(Subscript(Var("foo"), Var("i")), ex)
             self.outs.append(Var("foo"))

@@ -89,9 +89,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self._logger.debug(inputs)
         if ufunc.__name__ == 'multiply':
             self._logger.debug("FOO")
-        cls = func_to_numpy_ex(ufunc)
+        # cls = func_to_numpy_ex(ufunc)
         args = [arg_to_numpy_ex(arg) for arg in inputs]
-        return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=cls(args[0], args[1]))
+        return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=BinaryNumpyEx(args[0], args[1], ufunc))
 
 
 
