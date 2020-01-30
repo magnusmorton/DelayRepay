@@ -67,18 +67,9 @@ class CLFunction(CLTree):
     body: List[CLTree]
 
 
-class Visitor:
-    def visit(self, node):
-        """Visit a node."""
-        method = 'visit_' + node.__class__.__name__
-        visitor = getattr(self, method, self.list_visit)
-        return visitor(node)
-
-    def list_visit(self, lst):
-        return [self.visit(node) for node in lst]
 
     
-class CLEmitter(Visitor):
+class CLEmitter(num.Visitor):
     
     preamble = "int i = get_global_id(0);"
 
@@ -105,7 +96,7 @@ class CLEmitter(Visitor):
     def visit_CLFunction(self, node):
         return "__kernel void {} ({}) {{\n{}\n{}\n}}".format(node.name, self.visit(node.args), self.preamble,  "\n".join(self.visit(node.body)))
 
-class CLVarVisitor(Visitor):
+class CLVarVisitor(num.Visitor):
     pass
 
 
@@ -115,7 +106,7 @@ class GPUTransformer(num.NumpyVisitor):
         self.ins = {}
         self.outs = []
 
-    def visit_binary(self, node):
+    def visit_BinaryNumpyEx(self, node):
         cur_visits = self.visits
         ex = BinaryExpression(node.to_op(), self.visit(node.left), self.visit(node.right))
         if cur_visits == 1:
@@ -123,12 +114,12 @@ class GPUTransformer(num.NumpyVisitor):
             self.outs.append(Var("foo"))
         return ex
 
-    def visit_array(self, node):
+    def visit_NPArray(self, node):
         var = Var('a')
         self.ins[var] = node.array
         return Subscript(var, Var('i'))
 
-    def visit_scalar(self, node):
+    def visit_Scalar(self, node):
         return Scalar(node.val)
 
 

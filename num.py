@@ -81,47 +81,66 @@ class Scalar(NPAtom):
     '''a scalar'''
     val: Number
 
-class NumpyVisitor:
+
+class Visitor:
+    '''Visitor ABC'''
+    def visit(self, node):
+        """Visit a node."""
+        method = 'visit_' + node.__class__.__name__
+        visitor = getattr(self, method, self.list_visit)
+        return visitor(node)
+
+    def list_visit(self, lst):
+        return [self.visit(node) for node in lst]
+
+
+class NumpyVisitor(Visitor):
+    '''Visits Numpy Expression'''
     def __init__(self):
         self.visits = 0
     '''visitor ABC'''
+    # def visit(self, node):
+    #     '''generic visit'''
+    #     self.visits += 1
+    #     logger.debug("visiting {}. visits: {}".format(node, self.visits))
+    #     if isinstance(node, BinaryNumpyEx):
+    #         ret =  self.visit_binary(node)
+    #     elif isinstance(node, NPArray):
+    #         ret = self.visit_array(node)
+    #     elif isinstance(node, Var):
+    #         ret =  self.visit_var(node)
+    #     elif isinstance(node, Scalar):
+    #         ret =  self.visit_scalar(node)
+    #     else:
+    #         logger.critical("!!!!!Not Implemented!!!!!")
+    #         ret =  NotImplemented
+    #     return ret
+
     def visit(self, node):
-        '''generic visit'''
+        """Visit a node."""
         self.visits += 1
-        logger.debug("visiting {}. visits: {}".format(node, self.visits))
-        if isinstance(node, BinaryNumpyEx):
-            ret =  self.visit_binary(node)
-        elif isinstance(node, NPArray):
-            ret = self.visit_array(node)
-        elif isinstance(node, Var):
-            ret =  self.visit_var(node)
-        elif isinstance(node, Scalar):
-            ret =  self.visit_scalar(node)
-        else:
-            logger.critical("!!!!!Not Implemented!!!!!")
-            ret =  NotImplemented
-        return ret
+        return super(NumpyVisitor, self).visit(node)
 
     def walk(self, tree):
         ''' top-level walk of tree'''
         self.visits = 0
         logger.debug("walking from top")
         return self.visit(tree)
-    
+
 class NumpyVarVisitor(NumpyVisitor):
     '''visits and returns new tree with arrays replaced with vars'''
     def __init__(self):
         self.arrays = {}
         super(NumpyVarVisitor, self).__init__()
 
-    def visit_binary(self, node):
+    def visit_BinaryNumpyEx(self, node):
         '''visit BinaryNumpyEx'''
         return type(node)(
             self.visit(node.left),
             self.visit(node.right)
         )
 
-    def visit_array(self, node):
+    def visit_NPArray(self, node):
         '''visit NPArray'''
         if node in self.arrays:
             name = self.arrays[node]
@@ -130,7 +149,8 @@ class NumpyVarVisitor(NumpyVisitor):
             self.arrays[node] = name
         return Var(name)
 
-    def visit_scalar(self, node):
+    def visit_Scalar(self, node):
+        '''Visit scalar'''
         return node
 
 class StringVisitor(NumpyVisitor):
