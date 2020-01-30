@@ -22,7 +22,21 @@ class TestElWise(unittest.TestCase):
         res = a * self.arr
         npt.assert_array_almost_equal(res, self.np_arr * 7)
 
+    def test_axpy(self):
+        def axpy(a,x,y):
+            return a*x + y
+        res = axpy(8, self.arr, 9)
+        npt.assert_array_almost_equal(res, axpy(8, self.np_arr, 9))
+
+
+class TestVector(unittest.TestCase):
+    def test_dot(self):
+        arr = array([1,2,3])
+        np_arr = np.array([1,2,3])
+        res = arr.dot(arr)
+        npt.assert_array_almost_equal(res, np_arr.dot(np_arr))
+
 if __name__ == '__main__':
-    # logging.basicConfig( level=logging.DEBUG)
+    logging.basicConfig( level=logging.DEBUG)
     unittest.main()
     
