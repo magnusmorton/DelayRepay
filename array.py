@@ -97,7 +97,11 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def __array_function__(self, func, types, args, kwargs):
         self._logger.debug("array_function")
-        return self
+        self._logger.debug("func: {}".format(func))
+
+        self._logger.debug("args: {}".format(type(args)))
+        args = [arg_to_numpy_ex(arg) for arg in args]
+        return DelayArray(self.shape, ops=(func, args, kwargs), ex=DotEx(args[0], args[1]))
 
     def astype(self, *args, **kwargs):
         self._ndarray = self._ndarray.astype(*args, **kwargs)
@@ -106,6 +110,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         else:
             raise Exception("Dont call astype here")
         return self
+
+    def dot(self, other, out=None):
+        return np.dot(self, other)
 
 
 array = cast(np.array)

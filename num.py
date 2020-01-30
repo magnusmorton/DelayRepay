@@ -12,6 +12,13 @@ logger = logging.getLogger("delayRepay.num")
 class NumpyEx:
     '''Numpy expression'''
 
+
+@dataclass
+class DotEx(NumpyEx):
+    arg1: NumpyEx
+    arg2: NumpyEx
+    
+
 @dataclass
 class BinaryNumpyEx(NumpyEx):
     '''Binary numpy expression'''
