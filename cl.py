@@ -148,8 +148,6 @@ def run_gpu(numpy_ex):
     transformer =  GPUTransformer()
     gpu_ex = transformer.walk(numpy_ex)
     args = CLArgs(list(transformer.ins.keys()) + transformer.outs, ["float*"] * (len(transformer.ins) + len(transformer.outs)))
-    print(args)
     func = CLFunction(args, "gfunc", [gpu_ex])
     kernel = CLEmitter().visit(func)
-    print(kernel)
     return executor(kernel, list(transformer.ins.values()), None)
