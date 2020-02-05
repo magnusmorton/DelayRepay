@@ -9,8 +9,6 @@ import numpy as np
 
 logger = logging.getLogger("delayRepay.cl")
 
-
-
 @dataclass
 class CLTree:
     '''CL tree node'''
@@ -18,6 +16,11 @@ class CLTree:
 @dataclass
 class Expression(CLTree):
     '''Expression'''
+
+@dataclass
+class DotExpression(Expression):
+    arg1: Expression
+    arg2: Expression
 
 @dataclass
 class BinaryExpression(Expression):
@@ -52,8 +55,6 @@ class Subscript(Expression):
     var: Var
     sub: Expression
 
-
-
 @dataclass
 class CLArgs(CLTree):
     params: List[Var]
@@ -68,7 +69,6 @@ class CLFunction(CLTree):
 
 
 
-    
 class CLEmitter(num.Visitor):
     
     preamble = "int i = get_global_id(0);"
@@ -76,6 +76,8 @@ class CLEmitter(num.Visitor):
     def visit_BinaryExpression(self, node):
         return "{} {} {}".format(self.visit(node.left), node.op, self.visit(node.right))
 
+    def visit_DotExpression(self, node):
+        return "dot({}, {})"
 
     def visit_Subscript(self, node):
         return "{}[{}]".format(self.visit(node.var), self.visit(node.sub))
@@ -105,6 +107,7 @@ class GPUTransformer(num.NumpyVisitor):
     def __init__(self):
         self.ins = {}
         self.outs = []
+        super(GPUTransformer, self).__init__()
 
     def visit_BinaryNumpyEx(self, node):
         cur_visits = self.visits
@@ -115,36 +118,36 @@ class GPUTransformer(num.NumpyVisitor):
         return ex
 
     def visit_NPArray(self, node):
-        var = Var('a')
+        var = Var('delayvar{}'.format(len(self.ins)))
         self.ins[var] = node.array
         return Subscript(var, Var('i'))
 
     def visit_Scalar(self, node):
         return Scalar(node.val)
 
+    def visit_DotEx(self, node):
+        ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
+        return ex
 
 def function_coverter(tree: CLTree):
     pass
-    
 
-
-def executor(kernel, in_arr, out_arr):
+def executor(kernel, in_arrs, out_arr):
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
-    a_g = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=in_arr)
+    in_bufs = [cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=in_arr) for in_arr in in_arrs]
     prog = cl.Program(ctx,kernel).build()
-    res_g = cl.Buffer(ctx, mf.WRITE_ONLY, in_arr.nbytes)
-    prog.gfunc(queue, in_arr.shape, None, a_g, res_g)
-    res_np = np.empty_like(in_arr)
+    res_g = cl.Buffer(ctx, mf.WRITE_ONLY, in_arrs[0].nbytes)
+    prog.gfunc(queue, in_arrs[0].shape, None, *in_bufs, res_g)
+    res_np = np.empty_like(in_arrs[0])
     cl.enqueue_copy(queue, res_np, res_g)
     return res_np
-    
 
 def run_gpu(numpy_ex):
     transformer =  GPUTransformer()
     gpu_ex = transformer.walk(numpy_ex)
-    args = CLArgs(list(transformer.ins.keys()) + transformer.outs, ["float*", "float*"])
+    args = CLArgs(list(transformer.ins.keys()) + transformer.outs, ["float*"] * (len(transformer.ins) + len(transformer.outs)))
     func = CLFunction(args, "gfunc", [gpu_ex])
     kernel = CLEmitter().visit(func)
-    return executor(kernel, list(transformer.ins.values())[0], None)
+    return executor(kernel, list(transformer.ins.values()), None)
