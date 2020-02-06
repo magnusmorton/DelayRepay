@@ -32,22 +32,20 @@ class TestElWise(unittest.TestCase):
 
 class TestVector(unittest.TestCase):
 
+    def setUp(self):
+        self.arr = array([1,2,3]).astype(np.float32)
+        self.arr2 = array([3,2,1]).astype(np.float32)
+        self.np_arr = np.array([1,2,3])
+        self.np_arr2 = np.array([3,2,1])
+
     def test_vecadd(self):
-        arr = array([1,2,3]).astype(np.float32)
-        arr2 = array([3,2,1]).astype(np.float32)
-        res = arr + arr2
-        np_arr = np.array([1,2,3])
-        np_arr2 = np.array([3,2,1])
-        npt.assert_array_almost_equal(res, np_arr + np_arr2)
+        res = self.arr + self.arr2
+        npt.assert_array_almost_equal(res, self.np_arr + self.np_arr2)
 
 
     def test_vecmul(self):
-        arr = array([1,2,3]).astype(np.float32)
-        arr2 = array([3,2,1]).astype(np.float32)
-        res = arr * arr2
-        np_arr = np.array([1,2,3])
-        np_arr2 = np.array([3,2,1])
-        npt.assert_array_almost_equal(res, np_arr * np_arr2)
+        res = self.arr * self.arr2
+        npt.assert_array_almost_equal(res, self.np_arr * self.np_arr2)
                 
     def test_dot(self):
         arr = array([1,2,3])
