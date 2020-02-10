@@ -81,6 +81,12 @@ class CLFunction(CLTree):
     body: List[CLTree]
 
 
+@dataclass
+class CLKernel:
+    body: str
+    inputs: List
+
+
 class CLEmitter(num.Visitor):
 
     preamble = "int i = get_global_id(0);"
@@ -131,7 +137,8 @@ class GPUTransformer(num.NumpyVisitor):
 
     def visit_BinaryNumpyEx(self, node):
         cur_visits = self.visits
-        ex = BinaryExpression(node.to_op(), self.visit(node.left),
+        ex = BinaryExpression(node.to_op(),
+                              self.visit(node.left),
                               self.visit(node.right))
         if cur_visits == 1:
             ex = Assignment(Subscript(Var("foo"), Var("i")), ex)
@@ -145,6 +152,34 @@ class GPUTransformer(num.NumpyVisitor):
 
     def visit_Scalar(self, node):
         return Scalar(node.val)
+
+    def visit_DotEx(self, node):
+        ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
+        return ex
+
+
+class GPUEmitter(num.NumpyVisitor):
+
+    def __init__(self):
+        self.ins = {}
+        self.outs = []
+        self.kernels = []
+        super(GPUEmitter, self).__init__()
+
+    def visit_BinaryNumpyEx(self, node):
+        op = node.to_op()
+        left, lin = self.visit(node.left)
+        right, rin = self.visit(node.right)
+        stmt = "output[i] = {} {} {}".format(left, op, right)
+        kernel = CLKernel(stmt, lin + rin)
+        self.kernels.append(kernel)
+        return ("input{}[i]".format(self.visits), [kernel])
+
+    def visit_NPArray(self, node):
+        return ("input{}[i]".format(self.visits), [node.array])
+
+    def visit_Scalar(self, node):
+        return (node.val, [])
 
     def visit_DotEx(self, node):
         ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
@@ -171,9 +206,10 @@ def executor(kernel, in_arrs, out_arr):
 
 def run_gpu(numpy_ex):
     transformer = GPUTransformer()
+    trans = GPUEmitter()
     gpu_ex = transformer.walk(numpy_ex)
-    import pdb
-    pdb.set_trace()
+    kern = trans.walk(numpy_ex)
+    print(trans.kernels)
     # This is probably one of the worst lines of code I've ever written
     args = CLArgs(list(transformer.ins.keys()) + transformer.outs,
                   ["float*"] * (len(transformer.ins) + len(transformer.outs)))
