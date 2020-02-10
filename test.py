@@ -1,10 +1,13 @@
+'''Test simple cl examples'''
 import unittest
 import logging
+from array import ones, array
 import numpy as np
 import numpy.testing as npt
-from array import *
 
 class TestElWise(unittest.TestCase):
+    # pylint: disable=C
+    
     def setUp(self):
         self.arr = ones(5000).astype(np.float32)
         self.np_arr = np.ones(5000).astype(np.float32)
@@ -29,8 +32,14 @@ class TestElWise(unittest.TestCase):
         res = axpy(8, self.arr, 9)
         npt.assert_array_almost_equal(res, axpy(8, self.np_arr, 9))
 
+    def test_ir(self):
+        res = self.arr + 3
+        assert(res)
+
+
 
 class TestVector(unittest.TestCase):
+    # pylint: disable=C
 
     def setUp(self):
         self.arr = array([1,2,3]).astype(np.float32)
@@ -48,12 +57,11 @@ class TestVector(unittest.TestCase):
         npt.assert_array_almost_equal(res, self.np_arr * self.np_arr2)
                 
     def test_dot(self):
-        arr = array([1,2,3])
-        np_arr = np.array([1,2,3])
-        res = arr.dot(arr)
-        npt.assert_array_almost_equal(res, np_arr.dot(np_arr))
+        res = self.arr.dot(self.arr2)
+        npt.assert_array_almost_equal(res, self.np_arr.dot(self.np_arr2))
+
 
 if __name__ == '__main__':
-    # logging.basicConfig( level=logging.DEBUG)
+    logging.basicConfig(level=logging.ERROR)
     unittest.main()
     
