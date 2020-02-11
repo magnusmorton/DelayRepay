@@ -17,22 +17,37 @@ class NumpyEx:
 class DotEx(NumpyEx):
     arg1: NumpyEx
     arg2: NumpyEx
-    
+
 
 @dataclass
-class BinaryNumpyEx(NumpyEx):
-    '''Binary numpy expression'''
-    left: NumpyEx
-    right: NumpyEx
+class MapEx(NumpyEx):
     func: np.ufunc
+    arg: NumpyEx
 
+
+class Funcable:
     def to_op(self):
         return {
         'matmul': '@',
         'add': '+',
         'multiply': '*'
         }[self.func.__name__]
-    
+
+
+@dataclass
+class ReduceEx(NumpyEx, Funcable):
+    func: np.ufunc
+    arg: NumpyEx
+
+
+@dataclass
+class BinaryNumpyEx(NumpyEx, Funcable):
+    '''Binary numpy expression'''
+    left: NumpyEx
+    right: NumpyEx
+    func: np.ufunc
+
+
 # @dataclass
 # class Dot(BinaryNumpyEx):
 #     '''np.dot func'''
@@ -53,9 +68,11 @@ class BinaryNumpyEx(NumpyEx):
 #     '''np.add'''
 #     func  = np.add
 
+
 @dataclass
 class NPAtom(NumpyEx):
     '''an atom'''
+
 
 @dataclass
 class NPArray(NPAtom):
@@ -86,12 +103,18 @@ class Visitor:
     '''Visitor ABC'''
     def visit(self, node):
         """Visit a node."""
-        method = 'visit_' + node.__class__.__name__
-        visitor = getattr(self, method, self.list_visit)
+        if isinstance(node, list):
+            visitor = self.list_visit
+        else:
+            method = 'visit_' + node.__class__.__name__
+            visitor = getattr(self, method, self.default_visit)
         return visitor(node)
 
     def list_visit(self, lst):
         return [self.visit(node) for node in lst]
+
+    def default_visit(self, node):
+        return node
 
 
 class NumpyVisitor(Visitor):
@@ -120,6 +143,9 @@ class NumpyVisitor(Visitor):
         """Visit a node."""
         self.visits += 1
         return super(NumpyVisitor, self).visit(node)
+
+    def visit_BinaryExpression(self, node):
+        return node
 
     def walk(self, tree):
         ''' top-level walk of tree'''
@@ -192,5 +218,11 @@ class NumpyFunction:
 
     def __str__(self):
         return self._cpu()
-        
 
+
+class ReduceTransformer(NumpyVisitor):
+    def visit_DotEx(self, node):
+        left = self.visit(node.arg1)
+        right = self.visit(node.arg2)
+        muls = BinaryNumpyEx(left, right, np.multiply)
+        return ReduceEx(np.add, muls)

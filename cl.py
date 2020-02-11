@@ -169,11 +169,12 @@ class GPUEmitter(num.NumpyVisitor):
 
     def visit_BinaryNumpyEx(self, node):
         op = node.to_op()
+        curr_visit = self.visits
         left, lin = self.visit(node.left)
         right, rin = self.visit(node.right)
         stmt = "output[i] = {} {} {};".format(left, op, right)
         # I've made this too complicated for myself
-        name = "input{}".format(self.visits)
+        name = "input{}".format(curr_visit)
         kernel = CLKernel(name, stmt, {**lin, **rin})
         self.kernels.append(kernel)
         return (name+"[i]", {name: kernel})
@@ -190,9 +191,12 @@ class GPUEmitter(num.NumpyVisitor):
         ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
         return ex
 
+    def visit_ReduceEx(self, node):
+        curr_visit = self.visits
+        arg, input_arg = self.visit(node.arg)
+        op = node.to_op()
+        stmt = ""
 
-def function_coverter(tree: CLTree):
-    pass
 
 
 def executor(kernel, in_arrs, out_arr):
@@ -226,16 +230,13 @@ def executor(kernel, in_arrs, out_arr):
 
 def run_gpu(numpy_ex):
     trans = GPUEmitter()
-    kern = trans.walk(numpy_ex)
-    print(kern)
-    print(trans.kernels[0].to_kern())
+    kern = trans.walk(num.ReduceTransformer().visit(numpy_ex))
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     bufs = {}
 
     for kernel in trans.kernels:
-        print(kernel.inputs)
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
                 # TODO: fix sizing;get rid of first_arr
@@ -244,14 +245,11 @@ def run_gpu(numpy_ex):
                                       hostbuf=source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-    
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
     bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-
     for kernel in trans.kernels:
         inputs = [bufs[key] for key in kernel.inputs.keys()]
-        print(inputs)
 
         kernel.prog.foo(queue,
                         first_arr.shape,
