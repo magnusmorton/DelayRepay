@@ -1,14 +1,14 @@
 import logging
 from dataclasses import dataclass
 from numbers import Number
-from typing import List
+from typing import List, Dict
 
 import num
 import pyopencl as cl
 import numpy as np
 
 logger = logging.getLogger("delayRepay.cl")
-
+preamble = "int i = get_global_id(0);"
 
 @dataclass
 class CLTree:
@@ -83,13 +83,18 @@ class CLFunction(CLTree):
 
 @dataclass
 class CLKernel:
+    name: str
     body: str
-    inputs: List
+    inputs: Dict
+
+    def to_kern(self):
+        out = "__kernel void {} ({}, __global float *output){{\n{}\n{}\n}}"
+        inargs = ["__global const float* {}".format(name)
+                  for name in self.inputs.keys()]
+        return out.format("foo", ", ".join(inargs), preamble, self.body)
 
 
 class CLEmitter(num.Visitor):
-
-    preamble = "int i = get_global_id(0);"
 
     def visit_BinaryExpression(self, node):
         return "{} {} {}".format(
@@ -119,13 +124,9 @@ class CLEmitter(num.Visitor):
     def visit_CLFunction(self, node):
         return "__kernel void {} ({}) {{\n{}\n{}\n}}".format(
             node.name, self.visit(node.args),
-            self.preamble,
+            preamble,
             "\n".join(self.visit(node.body))
         )
-
-
-class CLVarVisitor(num.Visitor):
-    pass
 
 
 class GPUTransformer(num.NumpyVisitor):
@@ -170,16 +171,20 @@ class GPUEmitter(num.NumpyVisitor):
         op = node.to_op()
         left, lin = self.visit(node.left)
         right, rin = self.visit(node.right)
-        stmt = "output[i] = {} {} {}".format(left, op, right)
-        kernel = CLKernel(stmt, lin + rin)
+        stmt = "output[i] = {} {} {};".format(left, op, right)
+        # I've made this too complicated for myself
+        name = "input{}".format(self.visits)
+        kernel = CLKernel(name, stmt, {**lin, **rin})
         self.kernels.append(kernel)
-        return ("input{}[i]".format(self.visits), [kernel])
+        return (name+"[i]", {name: kernel})
 
     def visit_NPArray(self, node):
-        return ("input{}[i]".format(self.visits), [node.array])
+        name = "input{}".format(self.visits)
+        self.ins[name] = node.array
+        return (name+"[i]", {name: node.array})
 
     def visit_Scalar(self, node):
-        return (node.val, [])
+        return (node.val, {})
 
     def visit_DotEx(self, node):
         ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
@@ -204,15 +209,55 @@ def executor(kernel, in_arrs, out_arr):
     return res_np
 
 
+# def run_gpu(numpy_ex):
+#     transformer = GPUTransformer()
+#     trans = GPUEmitter()
+#     gpu_ex = transformer.walk(numpy_ex)
+#     kern = trans.walk(numpy_ex)
+#     print(kern)
+#     print(trans.kernels[0].to_kern())
+#     # This is probably one of the worst lines of code I've ever written
+#     args = CLArgs(list(transformer.ins.keys()) + transformer.outs,
+#                   ["float*"] * (len(transformer.ins) + len(transformer.outs)))
+#     func = CLFunction(args, "gfunc", [gpu_ex])
+#     kernel = CLEmitter().visit(func)
+#     return executor(kernel, list(transformer.ins.values()), None)
+
+
 def run_gpu(numpy_ex):
-    transformer = GPUTransformer()
     trans = GPUEmitter()
-    gpu_ex = transformer.walk(numpy_ex)
     kern = trans.walk(numpy_ex)
-    print(trans.kernels)
-    # This is probably one of the worst lines of code I've ever written
-    args = CLArgs(list(transformer.ins.keys()) + transformer.outs,
-                  ["float*"] * (len(transformer.ins) + len(transformer.outs)))
-    func = CLFunction(args, "gfunc", [gpu_ex])
-    kernel = CLEmitter().visit(func)
-    return executor(kernel, list(transformer.ins.values()), None)
+    print(kern)
+    print(trans.kernels[0].to_kern())
+    ctx = cl.create_some_context()
+    queue = cl.CommandQueue(ctx)
+    mf = cl.mem_flags
+    bufs = {}
+
+    for kernel in trans.kernels:
+        print(kernel.inputs)
+        for ref, source in kernel.inputs.items():
+            if isinstance(source, np.ndarray):
+                # TODO: fix sizing;get rid of first_arr
+                first_arr = source
+                bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
+                                      hostbuf=source)
+            else:
+                bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+    
+        kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
+    last_kern = trans.kernels[-1]
+    bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+
+    for kernel in trans.kernels:
+        inputs = [bufs[key] for key in kernel.inputs.keys()]
+        print(inputs)
+
+        kernel.prog.foo(queue,
+                        first_arr.shape,
+                        None,
+                        *inputs,
+                        bufs[kernel.name])
+    res_np = np.empty_like(first_arr)
+    cl.enqueue_copy(queue, res_np, bufs[last_kern.name])
+    return res_np
