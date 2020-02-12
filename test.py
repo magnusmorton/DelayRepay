@@ -22,8 +22,7 @@ class TestElWise(unittest.TestCase):
 
     def test_var_add(self):
         a = 7
-       
-        res = a *  self.arr
+        res = a * self.arr
         npt.assert_array_almost_equal(res, self.np_arr * 7)
 
     def test_axpy(self):
@@ -56,7 +55,10 @@ class TestVector(unittest.TestCase):
 
     def test_dot(self):
         res = self.arr.dot(self.arr2)
-        self.assertEqual(res, self.np_arr.dot(self.np_arr2))
+        print(res)
+        test = self.np_arr.dot(self.np_arr2)
+        print(test)
+        self.assertEqual(float(res),test)
 
     def test_reduction(self):
         res = self.arr.dot(self.arr2)

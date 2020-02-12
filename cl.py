@@ -204,20 +204,21 @@ class GPUEmitter(num.NumpyVisitor):
   // get me stuff in local mem plsthnx
         int local_id = get_local_id(0);
     int group_size = get_local_size(0);
-    localSums[local_id] = input[global_id];
+    float localSums[1025];
+    localSums[local_id] = {};
     barrier(CLK_LOCAL_MEM_FENCE);
-    for (int offset = 1; offset < group_size; offset <<= 1) {
+    for (int offset = 1; offset < group_size; offset <<= 1) {{
         int mask = (offset << 1) - 1;
-        if ((local_id & mask) == 0) {
+        if ((local_id & mask) == 0) {{
             localSums[local_id] += localSums[offset];
-        }
+        }}
         barrier(CLK_LOCAL_MEM_FENCE);
-    }
-    if (local_id == 0) {
+    }}
+    if (local_id == 0) {{
         output[get_group_id(0)] = localSums[0];
 
-    }
-        """
+    }}
+        """.format(arg)
         name = "input{}".format(curr_visit)
         kernel = TerminalKernel(name, stmt, input_arg, np.sum)
         self.kernels.append(kernel)
@@ -247,6 +248,7 @@ def run_gpu(numpy_ex):
     bufs = {}
 
     for kernel in trans.kernels:
+        print("FOO")
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
                 # TODO: fix sizing;get rid of first_arr
@@ -255,16 +257,21 @@ def run_gpu(numpy_ex):
                                       hostbuf=source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-        if not isinstance(kernel, TerminalKernel):
             kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
     bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
     for kernel in trans.kernels:
         if isinstance(kernel, TerminalKernel):
             res_np = np.empty_like(first_arr)
-            key = list(kernel.inputs.keys())[0]
-            cl.enqueue_copy(queue, res_np, bufs[key])
-            
+            inputs = [bufs[key] for key in kernel.inputs.keys()]
+            # key = list(kernel.inputs.keys())[0]
+            # cl.enqueue_copy(queue, res_np, bufs[key])
+            kernel.prog.foo(queue,
+                        first_arr.shape,
+                        None,
+                        *inputs,
+                        bufs[kernel.name])
+            cl.enqueue_copy(queue, res_np, bufs[kernel.name])
             return kernel.post(res_np)
         print(kernel)
         print(bufs.keys())
