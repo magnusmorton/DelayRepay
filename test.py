@@ -56,7 +56,7 @@ class TestVector(unittest.TestCase):
 
     def test_dot(self):
         res = self.arr.dot(self.arr2)
-        npt.assert_array_almost_equal(res, self.np_arr.dot(self.np_arr2))
+        self.assertEqual(res, self.np_arr.dot(self.np_arr2))
 
     def test_reduction(self):
         res = self.arr.dot(self.arr2)

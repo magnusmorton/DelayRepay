@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from numbers import Number
-from typing import List, Dict
+from typing import List, Dict, Callable
 
 import num
 import pyopencl as cl
@@ -92,6 +92,11 @@ class CLKernel:
         inargs = ["__global const float* {}".format(name)
                   for name in self.inputs.keys()]
         return out.format("foo", ", ".join(inargs), preamble, self.body)
+
+
+@dataclass
+class TerminalKernel(CLKernel):
+    post: Callable
 
 
 class CLEmitter(num.Visitor):
@@ -195,8 +200,28 @@ class GPUEmitter(num.NumpyVisitor):
         curr_visit = self.visits
         arg, input_arg = self.visit(node.arg)
         op = node.to_op()
-        stmt = ""
+        stmt = """
+  // get me stuff in local mem plsthnx
+        int local_id = get_local_id(0);
+    int group_size = get_local_size(0);
+    localSums[local_id] = input[global_id];
+    barrier(CLK_LOCAL_MEM_FENCE);
+    for (int offset = 1; offset < group_size; offset <<= 1) {
+        int mask = (offset << 1) - 1;
+        if ((local_id & mask) == 0) {
+            localSums[local_id] += localSums[offset];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    if (local_id == 0) {
+        output[get_group_id(0)] = localSums[0];
 
+    }
+        """
+        name = "input{}".format(curr_visit)
+        kernel = TerminalKernel(name, stmt, input_arg, np.sum)
+        self.kernels.append(kernel)
+        return (name+"[i]", {name: kernel})
 
 
 def executor(kernel, in_arrs, out_arr):
@@ -213,24 +238,9 @@ def executor(kernel, in_arrs, out_arr):
     return res_np
 
 
-# def run_gpu(numpy_ex):
-#     transformer = GPUTransformer()
-#     trans = GPUEmitter()
-#     gpu_ex = transformer.walk(numpy_ex)
-#     kern = trans.walk(numpy_ex)
-#     print(kern)
-#     print(trans.kernels[0].to_kern())
-#     # This is probably one of the worst lines of code I've ever written
-#     args = CLArgs(list(transformer.ins.keys()) + transformer.outs,
-#                   ["float*"] * (len(transformer.ins) + len(transformer.outs)))
-#     func = CLFunction(args, "gfunc", [gpu_ex])
-#     kernel = CLEmitter().visit(func)
-#     return executor(kernel, list(transformer.ins.values()), None)
-
-
 def run_gpu(numpy_ex):
     trans = GPUEmitter()
-    kern = trans.walk(num.ReduceTransformer().visit(numpy_ex))
+    trans.walk(num.ReduceTransformer().visit(numpy_ex))
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
@@ -245,10 +255,19 @@ def run_gpu(numpy_ex):
                                       hostbuf=source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-        kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
+        if not isinstance(kernel, TerminalKernel):
+            kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
     bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
     for kernel in trans.kernels:
+        if isinstance(kernel, TerminalKernel):
+            res_np = np.empty_like(first_arr)
+            key = list(kernel.inputs.keys())[0]
+            cl.enqueue_copy(queue, res_np, bufs[key])
+            
+            return kernel.post(res_np)
+        print(kernel)
+        print(bufs.keys())
         inputs = [bufs[key] for key in kernel.inputs.keys()]
 
         kernel.prog.foo(queue,
