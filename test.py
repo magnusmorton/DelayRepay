@@ -1,7 +1,7 @@
 '''Test simple cl examples'''
 import unittest
 import logging
-from array import ones, array, ReduceTransformer
+from array import ones, array, full,  ReduceTransformer
 import numpy as np
 import numpy.testing as npt
 
@@ -38,12 +38,14 @@ class TestElWise(unittest.TestCase):
 
 class TestVector(unittest.TestCase):
     # pylint: disable=C
+    SIZE = 10240
 
     def setUp(self):
-        self.arr = array([1, 2, 3]).astype(np.float32)
-        self.arr2 = array([3, 2, 1]).astype(np.float32)
-        self.np_arr = np.array([1, 2, 3])
-        self.np_arr2 = np.array([3, 2, 1])
+        self.arr = full((self.SIZE,), 7).astype(np.float32)
+        self.arr2 = full((self.SIZE,), 3).astype(np.float32)
+        self.np_arr = np.full((self.SIZE,), 7).astype(np.float32)
+        self.np_arr2 = np.full((self.SIZE,), 3).astype(np.float32)
+
 
     def test_vecadd(self):
         res = self.arr + self.arr2
@@ -59,10 +61,6 @@ class TestVector(unittest.TestCase):
         test = self.np_arr.dot(self.np_arr2)
         print(test)
         self.assertEqual(float(res),test)
-
-    def test_reduction(self):
-        res = self.arr.dot(self.arr2)
-        print(ReduceTransformer().visit(res.ex))
 
 
 if __name__ == '__main__':
