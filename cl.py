@@ -86,17 +86,13 @@ class CLKernel:
     name: str
     body: str
     inputs: Dict
+    reducing: bool = False
 
     def to_kern(self):
         out = "__kernel void {} ({}, __global float *output){{\n{}\n{}\n}}"
         inargs = ["__global const float* {}".format(name)
                   for name in self.inputs.keys()]
         return out.format("foo", ", ".join(inargs), preamble, self.body)
-
-
-@dataclass
-class TerminalKernel(CLKernel):
-    post: Callable
 
 
 class CLEmitter(num.Visitor):
@@ -201,10 +197,27 @@ class GPUEmitter(num.NumpyVisitor):
         arg, input_arg = self.visit(node.arg)
         op = node.to_op()
         stmt = """
-        output[i] = {};
+         int local_id = get_local_id(0);
+    int group_size = get_local_size(0);
+
+   // get me stuff in local mem plsthnx
+    __local float localSums[64];
+    localSums[local_id] = {};
+    barrier(CLK_LOCAL_MEM_FENCE);
+    for (int offset = 1; offset < group_size; offset <<= 1) {{
+        int mask = (offset << 1) - 1;
+        if ((local_id & mask) == 0) {{
+            localSums[local_id] += localSums[offset];
+        }}
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }}
+    if (local_id == 0) {{
+        output[get_group_id(0)] = localSums[0];
+
+    }}
         """.format(arg)
         name = "input{}".format(curr_visit)
-        kernel = CLKernel(name, stmt, input_arg)
+        kernel = CLKernel(name, stmt, input_arg, reducing=True)
         self.kernels.append(kernel)
         return (name+"[i]", {name: kernel})
 
@@ -225,13 +238,12 @@ def executor(kernel, in_arrs, out_arr):
 
 def run_gpu(numpy_ex):
     trans = GPUEmitter()
-    trans.walk(num.ReduceTransformer().visit(numpy_ex))
+    trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     bufs = {}
     for kernel in trans.kernels:
-        print("FOO")
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
                 # TODO: fix sizing;get rid of first_arr
@@ -242,17 +254,20 @@ def run_gpu(numpy_ex):
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
             kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
-    bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+
+    if last_kern.reducing:
+        bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
+    else:
+        bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
     events = []
     for kernel in trans.kernels:
-        print(bufs.keys())
         inputs = [bufs[key] for key in kernel.inputs.keys()]
 
         events.append(kernel.prog.foo(queue,
-                        first_arr.shape,
-                        (64,),
-                        *inputs,
-                        bufs[kernel.name]))
-    res_np = np.empty_like(first_arr)
+                                      first_arr.shape,
+                                      (64,),
+                                      *inputs,
+                                      bufs[kernel.name]))
+    res_np = np.empty((160,)).astype(np.float32)
     cl.enqueue_copy(queue, res_np, bufs[last_kern.name], wait_for=events)
     return res_np

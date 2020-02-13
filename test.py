@@ -57,10 +57,8 @@ class TestVector(unittest.TestCase):
 
     def test_dot(self):
         res = self.arr.dot(self.arr2)
-        print(res)
         test = self.np_arr.dot(self.np_arr2)
-        print(test)
-        self.assertEqual(float(res),test)
+        self.assertEqual(res, test)
 
 
 if __name__ == '__main__':

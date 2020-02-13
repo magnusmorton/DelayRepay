@@ -3,15 +3,20 @@
 import logging
 from dataclasses import dataclass
 from numbers import Number
-from typing import List
+from typing import List, Tuple
 import numpy as np
 
 logger = logging.getLogger("delayRepay.num")
 
+OPS = {
+        'matmul': '@',
+        'add': '+',
+        'multiply': '*'
+        }
+
 @dataclass
 class NumpyEx:
     '''Numpy expression'''
-
 
 @dataclass
 class DotEx(NumpyEx):
@@ -27,11 +32,7 @@ class MapEx(NumpyEx):
 
 class Funcable:
     def to_op(self):
-        return {
-        'matmul': '@',
-        'add': '+',
-        'multiply': '*'
-        }[self.func.__name__]
+        return OPS[self.func.__name__]
 
 
 @dataclass
@@ -219,10 +220,47 @@ class NumpyFunction:
     def __str__(self):
         return self._cpu()
 
+class ShapeAnnotator(NumpyVisitor):
+
+    def calc_shape(left, right, op=None):
+        if left == (0,):
+            return right
+        if right is (0,):
+            return left
+        if op in OPS:
+            return left
+        if op == 'dot':
+            # for now
+            return (0,)
+
+    def visit_BinaryExpression(self, node):
+        left = self.visit(node.left)
+        right = self.visit(node.right)
+        node.shape = ShapeAnnotator.calc_shape(left, right, node.op)
+        return node
+
+    def visit_NPArray(self, node):
+        node.shape = node.array.shape
+        return node
+
+    def visit_Scalar(self, node):
+        node.shape = (0,)
+        return node
+
+    def visit_DotEx(self, node):
+        left = self.visit(node.arg1)
+        right = self.visit(node.arg2)
+        node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, 'dot')
+        node._inshape = left.shape
+        return node
+
 
 class ReduceTransformer(NumpyVisitor):
     def visit_DotEx(self, node):
         left = self.visit(node.arg1)
         right = self.visit(node.arg2)
         muls = BinaryNumpyEx(left, right, np.multiply)
-        return ReduceEx(np.add, muls)
+        muls.shape = node._inshape
+        red = ReduceEx(np.add, muls)
+        red.shape = node.shape
+        return red
