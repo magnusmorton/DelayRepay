@@ -81,6 +81,8 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def __array__(self):
         # return NumpyFunction(self.ex)()
+        if isinstance(self.ex, NPArray):
+            return self.ex.array
         return run_gpu(self.ex)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
@@ -89,10 +91,17 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self._logger.debug(inputs)
         if ufunc.__name__ == 'multiply':
             self._logger.debug("FOO")
+        if ufunc.__name__ == 'matmul':
+            return self._dot(inputs, kwargs)
         # cls = func_to_numpy_ex(ufunc)
         args = [arg_to_numpy_ex(arg) for arg in inputs]
         return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=BinaryNumpyEx(args[0], args[1], ufunc))
 
+    def _dot(self, args, kwargs):
+        args = [arg_to_numpy_ex(arg) for arg in args]
+        res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
+        print(res)
+        return np.sum(res)
 
 
     def __array_function__(self, func, types, args, kwargs):
@@ -131,6 +140,7 @@ def arg_to_numpy_ex(arg:Any) -> NumpyEx:
         return Scalar(arg)
     else:
         print(arg)
+        print(type(arg))
         raise NotImplementedError
 
 def func_to_numpy_ex(func):

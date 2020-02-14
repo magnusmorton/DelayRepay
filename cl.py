@@ -236,6 +236,11 @@ def executor(kernel, in_arrs, out_arr):
     return res_np
 
 
+def fuse_kernels(kernels):
+    fused = []
+    for kernel in kernels:
+        print(kernel)
+
 def run_gpu(numpy_ex):
     trans = GPUEmitter()
     trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
@@ -243,7 +248,7 @@ def run_gpu(numpy_ex):
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     bufs = {}
-
+    fused = fuse_kernels(trans.kernels)
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
@@ -256,6 +261,9 @@ def run_gpu(numpy_ex):
             kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
     resshape = first_arr.shape
+    shape = first_arr.shape
+    if len(shape) > 1:
+        shape = (shape[0] * shape[1],)
     if last_kern.reducing:
         resshape = (resshape[0] // 64,)
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
@@ -263,11 +271,12 @@ def run_gpu(numpy_ex):
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
     events = []
     for kernel in trans.kernels:
+        group_shape = (64,)
         inputs = [bufs[key] for key in kernel.inputs.keys()]
-
+        print(first_arr.shape)
         events.append(kernel.prog.foo(queue,
-                                      first_arr.shape,
-                                      (64,),
+                                      shape,
+                                      group_shape,
                                       *inputs,
                                       bufs[kernel.name]))
     res_np = np.empty(resshape).astype(np.float32)

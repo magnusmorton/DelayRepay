@@ -61,6 +61,31 @@ class TestVector(unittest.TestCase):
         self.assertEqual(res, test)
 
 
+    def test_matmul(self):
+        res = self.arr @ self.arr2
+        print(res)
+        test = self.np_arr @ self.np_arr2
+        self.assertEqual(res, test)
+
+
+
+class TestMatrix(unittest.TestCase):
+
+    def setUp(self):
+        self.mat = full((SIZE,SIZE), 7).astype(np.float32)
+        self.vec = full((SIZE,), 3).astype(np.float32)
+        self.np_mat = np.full((SIZE,SIZE), 7).astype(np.float32)
+        self.np_vec = np.full((SIZE,), 3).astype(np.float32)
+
+    def test_scalar_mul(self):
+        res = self.mat * 3
+        npt.assert_array_almost_equal(res, self.np_mat * 3)
+
+    def test_matvec(self):
+        res = self.mat @ self.vec
+        test =  self.np_mat @ self.np_vec
+        print(res)
+        print(test)
+        
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.ERROR)
     unittest.main()
