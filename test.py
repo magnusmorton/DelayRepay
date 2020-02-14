@@ -5,12 +5,13 @@ from array import ones, array, full,  ReduceTransformer
 import numpy as np
 import numpy.testing as npt
 
+SIZE = 10240
 class TestElWise(unittest.TestCase):
     # pylint: disable=C
     
     def setUp(self):
-        self.arr = ones(5000).astype(np.float32)
-        self.np_arr = np.ones(5000).astype(np.float32)
+        self.arr = ones(SIZE).astype(np.float32)
+        self.np_arr = np.ones(SIZE).astype(np.float32)
 
     def test_scalar_add(self):
         res = self.arr + 1
@@ -38,13 +39,12 @@ class TestElWise(unittest.TestCase):
 
 class TestVector(unittest.TestCase):
     # pylint: disable=C
-    SIZE = 10240
 
     def setUp(self):
-        self.arr = full((self.SIZE,), 7).astype(np.float32)
-        self.arr2 = full((self.SIZE,), 3).astype(np.float32)
-        self.np_arr = np.full((self.SIZE,), 7).astype(np.float32)
-        self.np_arr2 = np.full((self.SIZE,), 3).astype(np.float32)
+        self.arr = full((SIZE,), 7).astype(np.float32)
+        self.arr2 = full((SIZE,), 3).astype(np.float32)
+        self.np_arr = np.full((SIZE,), 7).astype(np.float32)
+        self.np_arr2 = np.full((SIZE,), 3).astype(np.float32)
 
 
     def test_vecadd(self):

@@ -243,6 +243,7 @@ def run_gpu(numpy_ex):
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     bufs = {}
+
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
@@ -254,8 +255,9 @@ def run_gpu(numpy_ex):
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
             kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
-
+    resshape = first_arr.shape
     if last_kern.reducing:
+        resshape = (resshape[0] // 64,)
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
     else:
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
@@ -268,6 +270,6 @@ def run_gpu(numpy_ex):
                                       (64,),
                                       *inputs,
                                       bufs[kernel.name]))
-    res_np = np.empty((160,)).astype(np.float32)
+    res_np = np.empty(resshape).astype(np.float32)
     cl.enqueue_copy(queue, res_np, bufs[last_kern.name], wait_for=events)
     return res_np
