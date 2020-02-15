@@ -229,7 +229,6 @@ class ShapeAnnotator(NumpyVisitor):
         if right is (0,):
             return left
         if op.__name__ in OPS:
-            print("blah")
             return left
         if op.__name__ == 'dot':
             # for now
@@ -238,10 +237,6 @@ class ShapeAnnotator(NumpyVisitor):
     def visit_BinaryNumpyEx(self, node):
         left = self.visit(node.left)
         right = self.visit(node.right)
-        print("foo")
-        print(left.shape)
-        print("foo")
-        print(right.shape)
         node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, node.func)
         return node
 
@@ -269,4 +264,5 @@ class ReduceTransformer(NumpyVisitor):
         muls.shape = node._inshape
         red = ReduceEx(np.add, muls)
         red.shape = node.shape
+        red._inshape = node._inshape
         return red

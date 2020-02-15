@@ -63,7 +63,6 @@ class TestVector(unittest.TestCase):
 
     def test_matmul(self):
         res = self.arr @ self.arr2
-        print(res)
         test = self.np_arr @ self.np_arr2
         self.assertEqual(res, test)
 

@@ -178,18 +178,15 @@ class GPUEmitter(num.NumpyVisitor):
         for local in llocals + rlocals:
             stmts.append("float {};".format(local))
 
-        print(stmts)
         outvar = name
         if callshape is None or callshape != node.shape:
             outvar = "output[i]"
         stmt = "{} = {} {} {};".format(outvar, left, op, right)
         # I've made this too complicated for myself
         kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), {**lin, **rin})
-        print(node.shape)
-        print(callshape)
         if callshape is None or callshape != node.shape:
             self.kernels.append(kernel)
-            return (name, {name: kernel}, [], [])
+            return (name+"[i]", {name: kernel}, [], [])
         else:
             return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
 
@@ -207,8 +204,8 @@ class GPUEmitter(num.NumpyVisitor):
 
     def visit_ReduceEx(self, node):
         curr_visit = self.visits
-        arg, input_arg, stmts, mlocals = self.visit(node.arg)
-        op = node.to_op()
+        arg, input_arg, stmts, mlocals = self.visit(node.arg, callshape=node._inshape)
+        decls = ["float {};".format(local) for local in mlocals]
         stmt = """
          int local_id = get_local_id(0);
     int group_size = get_local_size(0);
@@ -230,7 +227,7 @@ class GPUEmitter(num.NumpyVisitor):
     }}
         """.format(arg)
         name = "input{}".format(curr_visit)
-        kernel = CLKernel(name, stmt, input_arg, reducing=True)
+        kernel = CLKernel(name, "\n".join(decls + stmts + [stmt]), input_arg, reducing=True)
         self.kernels.append(kernel)
         return (name+"[i]", {name: kernel})
 
@@ -249,11 +246,6 @@ def executor(kernel, in_arrs, out_arr):
     return res_np
 
 
-def fuse_kernels(kernels):
-    fused = []
-    for kernel in kernels:
-        print(kernel)
-
 def run_gpu(numpy_ex):
     trans = GPUEmitter()
     trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
@@ -261,9 +253,7 @@ def run_gpu(numpy_ex):
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     bufs = {}
-    fused = fuse_kernels(trans.kernels)
     for kernel in trans.kernels:
-        print(kernel.to_kern())
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
                 # TODO: fix sizing;get rid of first_arr
