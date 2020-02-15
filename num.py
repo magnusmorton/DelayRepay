@@ -102,14 +102,14 @@ class Scalar(NPAtom):
 
 class Visitor:
     '''Visitor ABC'''
-    def visit(self, node):
+    def visit(self, node, **kwargs):
         """Visit a node."""
         if isinstance(node, list):
             visitor = self.list_visit
         else:
             method = 'visit_' + node.__class__.__name__
             visitor = getattr(self, method, self.default_visit)
-        return visitor(node)
+        return visitor(node, **kwargs)
 
     def list_visit(self, lst):
         return [self.visit(node) for node in lst]
@@ -140,10 +140,10 @@ class NumpyVisitor(Visitor):
     #         ret =  NotImplemented
     #     return ret
 
-    def visit(self, node):
+    def visit(self, node, **kwargs):
         """Visit a node."""
         self.visits += 1
-        return super(NumpyVisitor, self).visit(node)
+        return super(NumpyVisitor, self).visit(node, **kwargs)
 
     def visit_BinaryExpression(self, node):
         return node
@@ -153,6 +153,7 @@ class NumpyVisitor(Visitor):
         self.visits = 0
         logger.debug("walking from top")
         return self.visit(tree)
+
 
 class NumpyVarVisitor(NumpyVisitor):
     '''visits and returns new tree with arrays replaced with vars'''
@@ -227,16 +228,21 @@ class ShapeAnnotator(NumpyVisitor):
             return right
         if right is (0,):
             return left
-        if op in OPS:
+        if op.__name__ in OPS:
+            print("blah")
             return left
-        if op == 'dot':
+        if op.__name__ == 'dot':
             # for now
             return (0,)
 
-    def visit_BinaryExpression(self, node):
+    def visit_BinaryNumpyEx(self, node):
         left = self.visit(node.left)
         right = self.visit(node.right)
-        node.shape = ShapeAnnotator.calc_shape(left, right, node.op)
+        print("foo")
+        print(left.shape)
+        print("foo")
+        print(right.shape)
+        node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, node.func)
         return node
 
     def visit_NPArray(self, node):
@@ -250,7 +256,7 @@ class ShapeAnnotator(NumpyVisitor):
     def visit_DotEx(self, node):
         left = self.visit(node.arg1)
         right = self.visit(node.arg2)
-        node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, 'dot')
+        node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, np.dot)
         node._inshape = left.shape
         return node
 

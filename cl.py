@@ -168,33 +168,46 @@ class GPUEmitter(num.NumpyVisitor):
         self.kernels = []
         super(GPUEmitter, self).__init__()
 
-    def visit_BinaryNumpyEx(self, node):
+    def visit_BinaryNumpyEx(self, node, callshape=None):
         op = node.to_op()
         curr_visit = self.visits
-        left, lin = self.visit(node.left)
-        right, rin = self.visit(node.right)
-        stmt = "output[i] = {} {} {};".format(left, op, right)
+        left, lin, lstmts, llocals = self.visit(node.left, callshape=node.shape)
+        right, rin, rstmts, rlocals = self.visit(node.right, callshape=node.shape)
+        name = "var{}".format(curr_visit)
+        stmts = []
+        for local in llocals + rlocals:
+            stmts.append("float {};".format(local))
+
+        print(stmts)
+        outvar = name
+        if callshape is None or callshape != node.shape:
+            outvar = "output[i]"
+        stmt = "{} = {} {} {};".format(outvar, left, op, right)
         # I've made this too complicated for myself
-        name = "input{}".format(curr_visit)
-        kernel = CLKernel(name, stmt, {**lin, **rin})
-        self.kernels.append(kernel)
-        return (name+"[i]", {name: kernel})
+        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), {**lin, **rin})
+        print(node.shape)
+        print(callshape)
+        if callshape is None or callshape != node.shape:
+            self.kernels.append(kernel)
+            return (name, {name: kernel}, [], [])
+        else:
+            return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
 
-    def visit_NPArray(self, node):
-        name = "input{}".format(self.visits)
+    def visit_NPArray(self, node, callshape=None):
+        name = "var{}".format(self.visits)
         self.ins[name] = node.array
-        return (name+"[i]", {name: node.array})
+        return (name+"[i]", {name: node.array}, [], [])
 
-    def visit_Scalar(self, node):
-        return (node.val, {})
+    def visit_Scalar(self, node, callshape=None):
+        return (node.val, {}, [], [])
 
-    def visit_DotEx(self, node):
+    def visit_DotEx(self, node, callshape=None):
         ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
         return ex
 
     def visit_ReduceEx(self, node):
         curr_visit = self.visits
-        arg, input_arg = self.visit(node.arg)
+        arg, input_arg, stmts, mlocals = self.visit(node.arg)
         op = node.to_op()
         stmt = """
          int local_id = get_local_id(0);
@@ -204,7 +217,7 @@ class GPUEmitter(num.NumpyVisitor):
     __local float localSums[64];
     localSums[local_id] = {};
     barrier(CLK_LOCAL_MEM_FENCE);
-    for (int offset = 1; offset < group_size; offset <<= 1) {{
+    for (int offset = 1; offset < group_size; offset <<= 1) {{ 
         int mask = (offset << 1) - 1;
         if ((local_id & mask) == 0) {{
             localSums[local_id] += localSums[offset];
@@ -250,6 +263,7 @@ def run_gpu(numpy_ex):
     bufs = {}
     fused = fuse_kernels(trans.kernels)
     for kernel in trans.kernels:
+        print(kernel.to_kern())
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
                 # TODO: fix sizing;get rid of first_arr
@@ -273,7 +287,6 @@ def run_gpu(numpy_ex):
     for kernel in trans.kernels:
         group_shape = (64,)
         inputs = [bufs[key] for key in kernel.inputs.keys()]
-        print(first_arr.shape)
         events.append(kernel.prog.foo(queue,
                                       shape,
                                       group_shape,
