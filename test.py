@@ -82,7 +82,7 @@ class TestMatrix(unittest.TestCase):
 
     def test_matvec(self):
         res = self.mat @ self.vec
-        test =  self.np_mat @ self.np_vec
+        test = self.np_mat @ self.np_vec
         print(res)
         print(test)
         
