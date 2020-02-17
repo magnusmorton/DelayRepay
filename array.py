@@ -100,12 +100,10 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def _dot(self, args, kwargs):
         args = [arg_to_numpy_ex(arg) for arg in args]
         res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
-        print(res)
         return np.sum(res)
 
 
     def __array_function__(self, func, types, args, kwargs):
-        print(type(func))
         self._logger.debug("array_function")
         self._logger.debug("func: {}".format(func))
 
