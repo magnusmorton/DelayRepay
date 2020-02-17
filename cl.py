@@ -1,9 +1,10 @@
 import logging
 from dataclasses import dataclass
 from numbers import Number
-from typing import List, Dict, Callable
+from typing import List, Dict
 
 import num
+import kernels
 import pyopencl as cl
 import numpy as np
 
@@ -206,26 +207,7 @@ class GPUEmitter(num.NumpyVisitor):
         curr_visit = self.visits
         arg, input_arg, stmts, mlocals = self.visit(node.arg, callshape=node._inshape)
         decls = ["float {};".format(local) for local in mlocals]
-        stmt = """
-         int local_id = get_local_id(0);
-    int group_size = get_local_size(0);
-
-   // get me stuff in local mem plsthnx
-    __local float localSums[64];
-    localSums[local_id] = {};
-    barrier(CLK_LOCAL_MEM_FENCE);
-    for (int offset = 1; offset < group_size; offset <<= 1) {{ 
-        int mask = (offset << 1) - 1;
-        if ((local_id & mask) == 0) {{
-            localSums[local_id] += localSums[offset];
-        }}
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }}
-    if (local_id == 0) {{
-        output[get_group_id(0)] = localSums[0];
-
-    }}
-        """.format(arg)
+        stmt = kernels.mag_sum.format(arg)
         name = "input{}".format(curr_visit)
         kernel = CLKernel(name, "\n".join(decls + stmts + [stmt]), input_arg, reducing=True)
         self.kernels.append(kernel)
