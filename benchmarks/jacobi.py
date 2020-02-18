@@ -22,11 +22,11 @@ guess = array([1.0,1.0])
 
 sol = jacobi(A,b,N=25,x=guess)
 
-print "A:"
-pprint(A)
+print("A:")
+print(A)
 
-print "b:"
-pprint(b)
+print("b:")
+print(b)
 
-print "x:"
-pprint(sol)
+print("x:")
+print(sol)
