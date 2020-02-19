@@ -1,7 +1,7 @@
 '''Test simple cl examples'''
 import unittest
 import logging
-from array import ones, array, full,  ReduceTransformer
+from delayarray import ones, array, full,  ReduceTransformer
 import numpy as np
 import numpy.testing as npt
 

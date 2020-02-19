@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import List, Any
 import numpy as np
 import numpy.lib.mixins
-from num import *
-from cl import run_gpu
+from .num import *
+from .cl import run_gpu
 
 def cast(func):
     '''cast to Delay array decorator'''

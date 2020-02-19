@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from numbers import Number
 from typing import List, Dict
 
-import num
-import kernels
+import delayarray.num as num
+import delayarray.kernels as kernels
 import pyopencl as cl
 import numpy as np
 

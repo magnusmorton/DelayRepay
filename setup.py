@@ -1,7 +1,7 @@
 
-from setuptools import setup, Extension, find_packages
+from setuptools import setup, find_packages
 
-__version__="0.1.0"
+__version__ = "0.1.0"
 
 setup(
     name="DelayArray",
@@ -10,11 +10,11 @@ setup(
     author="Magnus Morton",
     author_email="magnus.morton@ed.ac.uk",
     packages=find_packages(),
-    include_package_data = True,
+    include_package_data=True,
     test_suite="tests",
     install_requires=[
-#        "transmuter>=0.5",
         "numpy>=1.15",
-        "pyopencl"
+        "pyopencl>=2019.1",
+        "dataclasses"
     ]
 )
