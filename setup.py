@@ -13,7 +13,7 @@ setup(
     include_package_data=True,
     test_suite="tests",
     install_requires=[
-        "numpy>=1.15",
+        "numpy>=1.16",
         "pyopencl>=2019.1",
         "dataclasses"
     ]
