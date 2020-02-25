@@ -16,17 +16,18 @@ def jacobi(A,b,N=25,x=None):
         x = (b - dot(R,x)) / D
     return x
 
-A = array([[2.0,1.0],[5.0,7.0]])
-b = array([11.0,13.0])
-guess = array([1.0,1.0])
+def time_jacobi():
+    A = array([[2.0,1.0],[5.0,7.0]])
+    b = array([11.0,13.0])
+    guess = array([1.0,1.0])
 
-sol = jacobi(A,b,N=25,x=guess)
+    sol = jacobi(A,b,N=25,x=guess)
 
-print("A:")
-print(A)
+    print("A:")
+    print(A)
 
-print("b:")
-print(b)
+    print("b:")
+    print(b)
 
-print("x:")
-print(sol)
+    print("x:")
+    print(sol)
