@@ -199,10 +199,6 @@ class GPUEmitter(num.NumpyVisitor):
     def visit_Scalar(self, node, callshape=None):
         return (node.val, {}, [], [])
 
-    def visit_DotEx(self, node, callshape=None):
-        ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
-        return ex
-
     def visit_ReduceEx(self, node):
         curr_visit = self.visits
         arg, input_arg, stmts, mlocals = self.visit(node.arg, callshape=node._inshape)
@@ -235,6 +231,8 @@ def run_gpu(numpy_ex):
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     bufs = {}
+
+    # allocating memory
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
@@ -255,6 +253,10 @@ def run_gpu(numpy_ex):
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
     else:
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+
+
+
+    # scheduling
     events = []
     for kernel in trans.kernels:
         group_shape = (64,)
