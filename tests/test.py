@@ -55,10 +55,16 @@ class TestVector(unittest.TestCase):
         res = self.arr * self.arr2
         npt.assert_array_almost_equal(res, self.np_arr * self.np_arr2)
 
-    def test_dot(self):
+    def test_dot_method(self):
         res = self.arr.dot(self.arr2)
         test = self.np_arr.dot(self.np_arr2)
         self.assertEqual(res, test)
+
+    def test_dot_func(self):
+        res = np.dot(self.arr, self.arr2)
+        test = self.np_arr.dot(self.np_arr2)
+        self.assertEqual(res, test)
+
 
 
     def test_matmul(self):

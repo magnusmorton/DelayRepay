@@ -43,8 +43,6 @@ def calc_type(func, type1, type2):
     else:
         return type1
 
-    
-
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __new__(cls, shape, dtype='float32', buffer=None, offset=0,
                 strides=None, order=None, parent=None, ops=None, ex=None):
@@ -89,6 +87,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self._logger.debug("func: {}".format(ufunc))
         self._logger.debug(method)
         self._logger.debug(inputs)
+        print("not dot")
         if ufunc.__name__ == 'multiply':
             self._logger.debug("FOO")
         if ufunc.__name__ == 'matmul':
@@ -106,11 +105,11 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __array_function__(self, func, types, args, kwargs):
         self._logger.debug("array_function")
         self._logger.debug("func: {}".format(func))
-
         self._logger.debug("args: {}".format(type(args)))
-        args = [arg_to_numpy_ex(arg) for arg in args]
-        res = np.array(DelayArray(self.shape, ops=(func, args, kwargs), ex=DotEx( args[0], args[1])))
-        return np.sum(res)
+        if func.__name__ == "dot":
+            return self._dot(args, kwargs)
+        else:
+            return NotImplemented
 
     def astype(self, *args, **kwargs):
         self._ndarray = self._ndarray.astype(*args, **kwargs)
