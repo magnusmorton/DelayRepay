@@ -1,5 +1,7 @@
-from numpy import array, zeros, diag, diagflat, dot
-
+from delayarray import zeros, diag, diagflat
+from numpy import dot
+import delayarray.random as npr
+from benchmarks.common import JACOBI_SIZE
 def jacobi(A,b,N=25,x=None):
     """Solves the equation Ax=b via the Jacobi iterative method."""
     # Create an initial guess if needed                                                                                                                                                            
@@ -17,9 +19,9 @@ def jacobi(A,b,N=25,x=None):
     return x
 
 def time_jacobi():
-    A = array([[2.0,1.0],[5.0,7.0]])
-    b = array([11.0,13.0])
-    guess = array([1.0,1.0])
+    A = npr.rand(JACOBI_SIZE, JACOBI_SIZE)
+    b = npr.rand(JACOBI_SIZE, JACOBI_SIZE)
+    guess = npr.rand(JACOBI_SIZE)
 
     sol = jacobi(A,b,N=25,x=guess)
 
