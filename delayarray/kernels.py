@@ -97,6 +97,17 @@ __kernel void naive_matrix_vector_mul(const __global float * restrict A,
 """
 
 gemm = """
+	size_t work_group_id = get_group_id(0);
+	size_t local_thread_id = get_local_id(0);
+
+	float res = 0;
+	for( int i = 0; i< num_cols_A ; ++i )
+		res +=  {}[ work_group_id * num_cols_A + i ] * {}[ local_thread_id + i * num_rows_A ];
+
+        {}[work_group_id * num_cols_A + local_thread_id] = res;
+"""
+
+"""
 //each work group handle a row,
 //each thread in the work group hand a col
 //so spawn num_rows_A blocks, and num_cols_A threads

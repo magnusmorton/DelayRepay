@@ -26,6 +26,10 @@ class DotExpression(Expression):
     arg1: Expression
     arg2: Expression
 
+@dataclass
+class MMExpression(Expression):
+    arg1: Expression
+    arg2: Expression
 
 @dataclass
 class BinaryExpression(Expression):
@@ -140,18 +144,27 @@ class GPUTransformer(num.NumpyVisitor):
 
     def visit_BinaryNumpyEx(self, node):
         print("visit_BinaryNumpyEx")
+        print("visit_BinaryNumpyEx")
+        print("visit_BinaryNumpyEx")
+                    
         cur_visits = self.visits
         ex = BinaryExpression(node.to_op(),
                               self.visit(node.left),
                               self.visit(node.right))
         if cur_visits == 1:
+            print(node)
             ex = Assignment(Subscript(Var("foo"), Var("i")), ex)
             self.outs.append(Var("foo"))
         return ex
 
     def visit_NPArray(self, node):
+        print("visit_NPArray")
+        print("visit_NPArray")
+        print("visit_NPArray")        
         var = Var('delayvar{}'.format(len(self.ins)))
         self.ins[var] = node.array
+        print("visit_NPArray")
+        print(node)
         return Subscript(var, Var('i'))
 
     def visit_Scalar(self, node):
@@ -159,14 +172,12 @@ class GPUTransformer(num.NumpyVisitor):
 
     def visit_DotEx(self, node):
         ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
-        print("Dot Expression")
         return ex
 
 
 class GPUEmitter(num.NumpyVisitor):
 
     def __init__(self):
-        print("GPUEmitter init")
         self.ins = {}
         self.outs = []
         self.kernels = []
@@ -206,6 +217,37 @@ class GPUEmitter(num.NumpyVisitor):
         ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
         return ex
 
+    def visit_MMEx(self, node, callshape=None):
+        print("visit_MMEx")
+        curr_visit = self.visits
+        left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
+        right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
+        name = "var{}".format(curr_visit)
+        stmts = []
+        for local in llocals + rlocals:
+            stmts.append("float {};".format(local))
+
+        outvar = name
+        if callshape is None or callshape != node.shape:
+            outvar = "output"
+        stmt = kernels.gemm.format(left, right, outvar)
+
+        print("type")
+        print(type({**lin, **rin}))
+        d = {**lin, **rin}
+        d["num_rows_A"] = node.arg1.array.shape[0]
+        d["num_cols_A"] = node.arg1.array.shape[1]
+        for i in d:
+            print(i)
+        
+        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d)
+
+        if callshape is None or callshape != node.shape:
+            self.kernels.append(kernel)
+            return (name, {name: kernel}, [], [])
+        else:
+            return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
+    
     def visit_ReduceEx(self, node):
         curr_visit = self.visits
         arg, input_arg, stmts, mlocals = self.visit(node.arg, callshape=node._inshape)
@@ -232,10 +274,8 @@ def executor(kernel, in_arrs, out_arr):
 
 
 def run_gpu(numpy_ex):
-    print("run_gpu")
     trans = GPUEmitter()
     trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
-    print("walk done")
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
@@ -249,6 +289,7 @@ def run_gpu(numpy_ex):
                                       hostbuf=source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+            #print(kernel.to_kern())
             kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
     resshape = first_arr.shape
