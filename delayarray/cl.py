@@ -95,8 +95,12 @@ class CLKernel:
 
     def to_kern(self):
         out = "__kernel void {} ({}, __global float *output){{\n{}\n{}\n}}"
-        inargs = ["__global const float* {}".format(name)
-                  for name in self.inputs.keys()]
+        inargs = []
+        for name in self.inputs.keys():
+            if "var" in name:
+                inargs.append("__global const float* {}".format(name))
+            else:
+                inargs.append("const int {}".format(name))
         return out.format("foo", ", ".join(inargs), preamble, self.body)
 
 
@@ -109,6 +113,7 @@ class GPUEmitter(num.NumpyVisitor):
         super(GPUEmitter, self).__init__()
 
     def visit_BinaryNumpyEx(self, node, callshape=None):
+        print("visit_BinaryNumpyEx")
         op = node.to_op()
         curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.left, callshape=node.shape)
@@ -126,14 +131,15 @@ class GPUEmitter(num.NumpyVisitor):
         kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), {**lin, **rin})
         if callshape is None or callshape != node.shape:
             self.kernels.append(kernel)
-            return (name+"[i]", {name: kernel}, [], [])
+            return (name+"[i]", {name: kernel}, [], []) # HERE
         else:
             return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
 
     def visit_NPArray(self, node, callshape=None):
+        print("visit_NPArray")
         name = "var{}".format(self.visits)
         self.ins[name] = node.array
-        return (name+"[i]", {name: node.array}, [], [])
+        return (name+"[i]", {name: node.array}, [], []) # AND HERE
 
     def visit_Scalar(self, node, callshape=None):
         return (node.val, {}, [], [])
@@ -143,6 +149,18 @@ class GPUEmitter(num.NumpyVisitor):
         curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
         right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
+
+        if lstmts == []:
+            if left.endswith('[i]'):
+                left = left[:-3]
+
+        if rstmts == []:
+            if right.endswith('[i]'):
+                right = right[:-3]
+            
+        
+        print("visit_MMEx2")
+        
         name = "var{}".format(curr_visit)
         stmts = []
         for local in llocals + rlocals:
@@ -153,8 +171,6 @@ class GPUEmitter(num.NumpyVisitor):
             outvar = "output"
         stmt = kernels.gemm.format(left, right, outvar)
 
-        print("type")
-        print(type({**lin, **rin}))
         d = {**lin, **rin}
         d["num_rows_A"] = node.arg1.array.shape[0]
         d["num_cols_A"] = node.arg1.array.shape[1]
@@ -162,7 +178,7 @@ class GPUEmitter(num.NumpyVisitor):
             print(i)
         
         kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d)
-
+    
         if callshape is None or callshape != node.shape:
             self.kernels.append(kernel)
             return (name, {name: kernel}, [], [])
@@ -212,9 +228,9 @@ def run_gpu(numpy_ex):
                                       hostbuf=source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-            
-        kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
+
         print(kernel.to_kern())
+        kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
     resshape = first_arr.shape
     shape = first_arr.shape
