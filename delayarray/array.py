@@ -130,9 +130,10 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self._logger.debug("func: {}".format(func))
 
         self._logger.debug("args: {}".format(type(args)))
-        args = [arg_to_numpy_ex(arg) for arg in args]
-        res = np.array(DelayArray(self.shape, ops=(func, args, kwargs), ex=DotEx( args[0], args[1])))
-        return np.sum(res)
+        if func.__name__ == "dot":
+            return self._dot(args, kwargs)
+        else:
+            return NotImplemented
 
     def astype(self, *args, **kwargs):
         self._ndarray = self._ndarray.astype(*args, **kwargs)
