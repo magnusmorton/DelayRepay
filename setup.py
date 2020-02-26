@@ -9,7 +9,7 @@ setup(
     description="Delayed evaluation for GPUs in Python",
     author="Magnus Morton",
     author_email="magnus.morton@ed.ac.uk",
-    packages=find_packages(),
+    packages=["delayarray"],
     include_package_data=True,
     test_suite="tests",
     install_requires=[

@@ -100,81 +100,6 @@ class CLKernel:
         return out.format("foo", ", ".join(inargs), preamble, self.body)
 
 
-class CLEmitter(num.Visitor):
-
-    def visit_BinaryExpression(self, node):
-        return "{} {} {}".format(
-            self.visit(node.left), node.op, self.visit(node.right)
-        )
-
-    def visit_DotExpression(self, node):
-        return "dot({}, {})"
-
-    def visit_Subscript(self, node):
-        return "{}[{}]".format(self.visit(node.var), self.visit(node.sub))
-
-    def visit_Scalar(self, node):
-        return str(node.val)
-
-    def visit_Var(self, node):
-        return node.name
-
-    def visit_Assignment(self, node):
-        return "{} = {};".format(self.visit(node.left), self.visit(node.right))
-
-    def visit_CLArgs(self, node):
-        args = ["__global {} {}".format(typ, var)
-                for typ, var in zip(node.types, self.visit(node.params))]
-        return ", ".join(args)
-
-    def visit_CLFunction(self, node):
-        return "__kernel void {} ({}) {{\n{}\n{}\n}}".format(
-            node.name, self.visit(node.args),
-            preamble,
-            "\n".join(self.visit(node.body))
-        )
-
-
-class GPUTransformer(num.NumpyVisitor):
-
-    def __init__(self):
-        self.ins = {}
-        self.outs = []
-        super(GPUTransformer, self).__init__()
-
-    def visit_BinaryNumpyEx(self, node):
-        print("visit_BinaryNumpyEx")
-        print("visit_BinaryNumpyEx")
-        print("visit_BinaryNumpyEx")
-                    
-        cur_visits = self.visits
-        ex = BinaryExpression(node.to_op(),
-                              self.visit(node.left),
-                              self.visit(node.right))
-        if cur_visits == 1:
-            print(node)
-            ex = Assignment(Subscript(Var("foo"), Var("i")), ex)
-            self.outs.append(Var("foo"))
-        return ex
-
-    def visit_NPArray(self, node):
-        print("visit_NPArray")
-        print("visit_NPArray")
-        print("visit_NPArray")        
-        var = Var('delayvar{}'.format(len(self.ins)))
-        self.ins[var] = node.array
-        print("visit_NPArray")
-        print(node)
-        return Subscript(var, Var('i'))
-
-    def visit_Scalar(self, node):
-        return Scalar(node.val)
-
-    def visit_DotEx(self, node):
-        ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
-        return ex
-
-
 class GPUEmitter(num.NumpyVisitor):
 
     def __init__(self):
@@ -212,10 +137,6 @@ class GPUEmitter(num.NumpyVisitor):
 
     def visit_Scalar(self, node, callshape=None):
         return (node.val, {}, [], [])
-
-    def visit_DotEx(self, node, callshape=None):
-        ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
-        return ex
 
     def visit_MMEx(self, node, callshape=None):
         print("visit_MMEx")
@@ -280,6 +201,8 @@ def run_gpu(numpy_ex):
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     bufs = {}
+
+    # allocating memory
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
@@ -289,8 +212,9 @@ def run_gpu(numpy_ex):
                                       hostbuf=source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-            #print(kernel.to_kern())
-            kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
+            
+        kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
+        print(kernel.to_kern())
     last_kern = trans.kernels[-1]
     resshape = first_arr.shape
     shape = first_arr.shape
@@ -301,6 +225,10 @@ def run_gpu(numpy_ex):
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
     else:
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+
+
+
+    # scheduling
     events = []
     for kernel in trans.kernels:
         group_shape = (64,)

@@ -1,0 +1,5 @@
+asv==0.4.1
+cupy-cuda91==7.2.0
+dataclasses==0.7
+numpy>=1.17
+pyopencl==2019.1.2

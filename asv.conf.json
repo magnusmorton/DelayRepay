@@ -1,0 +1,10 @@
+{
+    "version": 1,
+    "project": "DelayRepay",
+    "repo": ".",
+    "matrix": {
+        "numpy": ["1.18"],
+        "cupy-cuda91":["7.2.0"]
+    }
+
+}

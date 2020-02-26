@@ -138,13 +138,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return np.dot(self, other)
 
 
-array = cast(np.array)
-
-ones = cast(np.ones)
-
-full = cast(np.full)
-
-
 def arg_to_numpy_ex(arg:Any) -> NumpyEx:
     from numbers import Number
     if isinstance(arg, DelayArray):
@@ -156,6 +149,7 @@ def arg_to_numpy_ex(arg:Any) -> NumpyEx:
         print(type(arg))
         raise NotImplementedError
 
+
 def func_to_numpy_ex(func):
     return {
         'matmul': Matmul,
@@ -164,52 +158,45 @@ def func_to_numpy_ex(func):
         }[func.__name__]
 
 
-# def vector_add():
-#     fun = UserFun(String("add"), Array([String("x"), String("y")], String("{ return x+y; }"), Seq([Float(), Float()]), Float()))
-#     size = SizeVar(String(name="N"))
-
-#     return LiftFunction(
-#         [ArrayTypeWSWC(Float(), size), ArrayTypeWSWC(Float(), size)],
-#         Lambda([Var("left"), Var("right")],
-#                Join().compose(MapWrg(
-#                    Join().compose(MapLcl(
-#                        MapSeq(fun))).compose(Split(Number(4)))
-#                    )).compose(Split(Number(1024))).apply(Zip(Var("left"), Var("right")))))
-        
-
-# class NumpyWalker:
-#     '''Simply evaluates the numpy ops'''
-#     def walk(self, arr):
-#         '''walk the array'''
-#         if arr.ops is None:
-#             print("NONE")
-#             print(arr._ndarray)
-#             return arr._ndarray
-#         return arr.ops[0](self.walk(arr.ops[1][0]), self.walk(arr.ops[1][1]))
-
-# class LiftWalker:
-#     def walk(self, _):
-#         pass
-
-#     def emit_mm(self, _):
-#         return
+# Ones and zeros
+empty = cast(np.empty)
+empty_like = cast(np.empty_like)
+eye = cast(np.eye)
+identity = cast(np.identity)
+ones = cast(np.ones)
+ones_like = cast(np.ones_like)
+zeros = cast(np.zeros)
+zeros_like = cast(np.zeros_like)
+full = cast(np.full)
+full_like = cast(np.full_like)
 
 
-def main():
-    ''' main method'''
-    arr = array([1, 2, 3])
-    arr2 = array([3,4,5])
-    #res = (arr @ arr) + arr2
-    res = arr + 1
-    print(res)
-    print(res.ex)
-    visitor = NumpyVarVisitor()
-    print(visitor.visit(res.ex))
-    func = NumpyFunction(res.ex)
-    print(func)
-    exec(str(func), globals())
-    print(jitfunc)
-    print(func())
+# From existing data
 
-if __name__ == "__main__":
-    main()
+array = cast(np.array)
+asarray = cast(np.asarray)
+asanyarray = cast(np.asanyarray)
+ascontiguousarray = cast(np.ascontiguousarray)
+asmatrix = cast(np.asmatrix)
+copy = cast(np.copy)
+frombuffer = cast(np.frombuffer)
+fromfile = cast(np.fromfile)
+fromfunction = cast(np.fromfunction)
+fromiter = cast(np.fromiter)
+fromstring = cast(np.fromstring)
+loadtxt = cast(np.loadtxt)
+
+# Numerical ranges
+arange = cast(np.arange)
+linspace = cast(np.linspace)
+logspace = cast(np.logspace)
+geomspace = cast(np.geomspace)
+
+
+# Building matrices
+diag = cast(np.diag)
+diagflat = cast(np.diagflat)
+tri = cast(np.tri)
+tril = cast(np.tril)
+triu = cast(np.triu)
+vander = cast(np.vander)

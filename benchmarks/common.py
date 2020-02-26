@@ -1,0 +1,1 @@
+JACOBI_SIZE = 640
