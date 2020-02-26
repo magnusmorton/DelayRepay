@@ -124,7 +124,7 @@ class GPUEmitter(num.NumpyVisitor):
             self.kernels.append(kernel)
             return (name+"[i]", {name: kernel}, [], [])
         else:
-            return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
+            return (name, {**lin, **rin},lstmts + rstmts + [stmt], [name] + llocals + rlocals)
 
     def visit_NPArray(self, node, callshape=None):
         name = "var{}".format(self.visits)
@@ -144,29 +144,14 @@ class GPUEmitter(num.NumpyVisitor):
         self.kernels.append(kernel)
         return (name+"[i]", {name: kernel})
 
-
-def executor(kernel, in_arrs, out_arr):
-    ctx = cl.create_some_context()
-    queue = cl.CommandQueue(ctx)
-    mf = cl.mem_flags
-    in_bufs = [cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=in_arr)
-               for in_arr in in_arrs]
-    prog = cl.Program(ctx, kernel).build()
-    res_g = cl.Buffer(ctx, mf.WRITE_ONLY, in_arrs[0].nbytes)
-    prog.gfunc(queue, in_arrs[0].shape, None, *in_bufs, res_g)
-    res_np = np.empty_like(in_arrs[0])
-    cl.enqueue_copy(queue, res_np, res_g)
-    return res_np
-
-
 def run_gpu(numpy_ex):
+    print(numpy_ex)
     trans = GPUEmitter()
     trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
     bufs = {}
-
     # allocating memory
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
@@ -179,7 +164,6 @@ def run_gpu(numpy_ex):
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
             
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
-        print(kernel.to_kern())
     last_kern = trans.kernels[-1]
     resshape = first_arr.shape
     shape = first_arr.shape
