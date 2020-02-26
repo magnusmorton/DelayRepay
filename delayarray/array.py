@@ -48,6 +48,7 @@ def calc_type(func, type1, type2):
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __new__(cls, shape, dtype='float32', buffer=None, offset=0,
                 strides=None, order=None, parent=None, ops=None, ex=None):
+        print("__new__ DelayArray")
         self = super(DelayArray, cls).__new__(cls)
         if buffer is not None:
             self._ndarray = buffer
@@ -69,26 +70,32 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return self
 
     def __repr__(self):
+        print("__repr__")
         return str(self.__array__())
 
 
     def child(self, ops):
+        print("child")
         return DelayArray(self.shape,  ops=ops)
     
     def walk(self):
+        print("walk")
         walker = NumpyWalker()
         return walker.walk(self)
 
     def __array__(self):
+        print("__array__")
         # return NumpyFunction(self.ex)()
         if isinstance(self.ex, NPArray):
             return self.ex.array
         return run_gpu(self.ex)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        print("__array_ufunc__")
         self._logger.debug("func: {}".format(ufunc))
         self._logger.debug(method)
         self._logger.debug(inputs)
+        print(ufunc.__name__)
         if ufunc.__name__ == 'multiply':
             self._logger.debug("FOO")
         if ufunc.__name__ == 'matmul':
@@ -98,12 +105,27 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=BinaryNumpyEx(args[0], args[1], ufunc))
 
     def _dot(self, args, kwargs):
+        # scalar result dot
+        print("_dot")
         args = [arg_to_numpy_ex(arg) for arg in args]
+        if (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 and args[1].array.shape[1] > 1):
+            return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1]))
+            # matrix x matrix
+        elif (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 or args[1].array.shape[1] > 1):
+            return DelayArray((args[0].array.shape[0],), ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1]))
+            # matrix x vector
+        elif (args[0].array.shape[0] > 1 or args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 or args[1].array.shape[1] > 1):
+            res = np.array(DelayArray((1,), ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
+            # vector x vector
+        else:
+            print("scalar?")
+            
         res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
         return np.sum(res)
 
 
     def __array_function__(self, func, types, args, kwargs):
+        print("__array_function__")
         self._logger.debug("array_function")
         self._logger.debug("func: {}".format(func))
 
@@ -121,6 +143,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return self
 
     def dot(self, other, out=None):
+        print("dot!")
         return np.dot(self, other)
 
 

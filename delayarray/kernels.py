@@ -94,8 +94,9 @@ __kernel void naive_matrix_vector_mul(const __global float * restrict A,
 	}
 	
 }
+"""
 
-
+gemm = """
 //each work group handle a row,
 //each thread in the work group hand a col
 //so spawn num_rows_A blocks, and num_cols_A threads

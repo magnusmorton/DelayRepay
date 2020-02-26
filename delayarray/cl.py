@@ -139,6 +139,7 @@ class GPUTransformer(num.NumpyVisitor):
         super(GPUTransformer, self).__init__()
 
     def visit_BinaryNumpyEx(self, node):
+        print("visit_BinaryNumpyEx")
         cur_visits = self.visits
         ex = BinaryExpression(node.to_op(),
                               self.visit(node.left),
@@ -158,12 +159,14 @@ class GPUTransformer(num.NumpyVisitor):
 
     def visit_DotEx(self, node):
         ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
+        print("Dot Expression")
         return ex
 
 
 class GPUEmitter(num.NumpyVisitor):
 
     def __init__(self):
+        print("GPUEmitter init")
         self.ins = {}
         self.outs = []
         self.kernels = []
@@ -229,8 +232,10 @@ def executor(kernel, in_arrs, out_arr):
 
 
 def run_gpu(numpy_ex):
+    print("run_gpu")
     trans = GPUEmitter()
     trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
+    print("walk done")
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags

@@ -48,7 +48,17 @@ class BinaryNumpyEx(NumpyEx, Funcable):
     right: NumpyEx
     func: np.ufunc
 
-
+@dataclass
+class MMMulEx(NumpyEx, Funcable):
+    left: NumpyEx
+    right: NumpyEx
+    
+#@dataclass
+#class DotEx(NumpyEx, Funcable):
+#    left: NumpyEx
+#    right: NumpyEx
+#    func: np.dot
+    
 # @dataclass
 # class Dot(BinaryNumpyEx):
 #     '''np.dot func'''
@@ -112,9 +122,11 @@ class Visitor:
         return visitor(node, **kwargs)
 
     def list_visit(self, lst):
+        print("list_visit")
         return [self.visit(node) for node in lst]
 
     def default_visit(self, node):
+        print("default_visit")
         return node
 
 
@@ -141,14 +153,17 @@ class NumpyVisitor(Visitor):
     #     return ret
 
     def visit(self, node, **kwargs):
+        print("visit")
         """Visit a node."""
         self.visits += 1
         return super(NumpyVisitor, self).visit(node, **kwargs)
 
     def visit_BinaryExpression(self, node):
+        print("visit_BinaryExpression")
         return node
 
     def walk(self, tree):
+        print("walk")
         ''' top-level walk of tree'''
         self.visits = 0
         logger.debug("walking from top")
@@ -162,6 +177,7 @@ class NumpyVarVisitor(NumpyVisitor):
         super(NumpyVarVisitor, self).__init__()
 
     def visit_BinaryNumpyEx(self, node):
+        print("visit_BinaryNumpyEx")
         '''visit BinaryNumpyEx'''
         return type(node)(
             self.visit(node.left),
@@ -169,6 +185,7 @@ class NumpyVarVisitor(NumpyVisitor):
         )
 
     def visit_NPArray(self, node):
+        print("visit_NPArray")
         '''visit NPArray'''
         if node in self.arrays:
             name = self.arrays[node]
@@ -178,6 +195,7 @@ class NumpyVarVisitor(NumpyVisitor):
         return Var(name)
 
     def visit_Scalar(self, node):
+        print("visit_Scalar")
         '''Visit scalar'''
         return node
 
@@ -185,13 +203,16 @@ class StringVisitor(NumpyVisitor):
     '''returns string of numpy expression'''
 
     def visit_binary(self, node: BinaryNumpyEx):
+        print("visit_binary")
         '''visit BinaryNumpyEx'''
         return "{}({}, {})".format("np." + node.func.__name__, self.visit(node.left), self.visit(node.right))
 
     def visit_var(self, node: Var):
+        print("visit_var")
         return node.name
 
     def visit_scalar(self, node: Scalar):
+        print("visit_scalar")
         return node.val
 
 class NumpyFunction:
@@ -235,34 +256,59 @@ class ShapeAnnotator(NumpyVisitor):
             return (0,)
 
     def visit_BinaryNumpyEx(self, node):
+        print("visit_BinaryNumpyEx")
         left = self.visit(node.left)
         right = self.visit(node.right)
         node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, node.func)
         return node
 
     def visit_NPArray(self, node):
+        print("visit_NPArray")
         node.shape = node.array.shape
         return node
 
     def visit_Scalar(self, node):
+        print("visit_Scalar")
         node.shape = (0,)
         return node
 
     def visit_DotEx(self, node):
+        print("visit_DotEx")
         left = self.visit(node.arg1)
         right = self.visit(node.arg2)
         node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, np.dot)
         node._inshape = left.shape
         return node
 
-
+class MMMulExTransformer(NumpyVisitor):
+    def visit_MMMulEx
+    
 class ReduceTransformer(NumpyVisitor):
     def visit_DotEx(self, node):
+        print("ReduceTransformer: visit_DotEx")
+        # TODO This is just for vector x vector
         left = self.visit(node.arg1)
         right = self.visit(node.arg2)
-        muls = BinaryNumpyEx(left, right, np.multiply)
-        muls.shape = node._inshape
-        red = ReduceEx(np.add, muls)
-        red.shape = node.shape
-        red._inshape = node._inshape
-        return red
+        print(left.array.shape)
+        print(right.array.shape)
+        if (left.array.shape[0] > 1 and left.array.shape[1] > 1) and (right.array.shape[0] > 1 and right.array.shape[1] > 1):
+            # matrix x matrix
+            print("matrix x matrix")
+            muls = DotEx(left, right)
+            muls.shape = (left.array.shape[0],right.array.shape[0])
+            return muls
+        elif (left.array.shape[0] > 1 and left.array.shape[1] > 1) and (right.array.shape[0] > 1 or right.array.shape[1] > 1):
+            # matrix x vector
+            print("matrix x vector")
+        elif (left.array.shape[0] > 1 or left.array.shape[1] > 1) and (right.array.shape[0] > 1 or right.array.shape[1] > 1):
+            # vector x vector
+            print("vector x vector")
+            muls = BinaryNumpyEx(left, right, np.multiply)
+            muls.shape = node._inshape
+            red = ReduceEx(np.add, muls)
+            red.shape = node.shape
+            red._inshape = node._inshape
+            return red
+        else:
+            print("scalar?")
+

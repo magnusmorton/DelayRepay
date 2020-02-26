@@ -85,6 +85,7 @@ class TestMatrix(unittest.TestCase):
         test = self.np_mat @ self.np_vec
         print(res)
         print(test)
+        self.assertEqual(res, test)
         
 if __name__ == '__main__':
     unittest.main()
