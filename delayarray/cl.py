@@ -96,71 +96,6 @@ class CLKernel:
         return out.format("foo", ", ".join(inargs), preamble, self.body)
 
 
-class CLEmitter(num.Visitor):
-
-    def visit_BinaryExpression(self, node):
-        return "{} {} {}".format(
-            self.visit(node.left), node.op, self.visit(node.right)
-        )
-
-    def visit_DotExpression(self, node):
-        return "dot({}, {})"
-
-    def visit_Subscript(self, node):
-        return "{}[{}]".format(self.visit(node.var), self.visit(node.sub))
-
-    def visit_Scalar(self, node):
-        return str(node.val)
-
-    def visit_Var(self, node):
-        return node.name
-
-    def visit_Assignment(self, node):
-        return "{} = {};".format(self.visit(node.left), self.visit(node.right))
-
-    def visit_CLArgs(self, node):
-        args = ["__global {} {}".format(typ, var)
-                for typ, var in zip(node.types, self.visit(node.params))]
-        return ", ".join(args)
-
-    def visit_CLFunction(self, node):
-        return "__kernel void {} ({}) {{\n{}\n{}\n}}".format(
-            node.name, self.visit(node.args),
-            preamble,
-            "\n".join(self.visit(node.body))
-        )
-
-
-class GPUTransformer(num.NumpyVisitor):
-
-    def __init__(self):
-        self.ins = {}
-        self.outs = []
-        super(GPUTransformer, self).__init__()
-
-    def visit_BinaryNumpyEx(self, node):
-        cur_visits = self.visits
-        ex = BinaryExpression(node.to_op(),
-                              self.visit(node.left),
-                              self.visit(node.right))
-        if cur_visits == 1:
-            ex = Assignment(Subscript(Var("foo"), Var("i")), ex)
-            self.outs.append(Var("foo"))
-        return ex
-
-    def visit_NPArray(self, node):
-        var = Var('delayvar{}'.format(len(self.ins)))
-        self.ins[var] = node.array
-        return Subscript(var, Var('i'))
-
-    def visit_Scalar(self, node):
-        return Scalar(node.val)
-
-    def visit_DotEx(self, node):
-        ex = DotExpression(self.visit(node.arg1), self.visit(node.arg2))
-        return ex
-
-
 class GPUEmitter(num.NumpyVisitor):
 
     def __init__(self):
@@ -242,7 +177,9 @@ def run_gpu(numpy_ex):
                                       hostbuf=source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-            kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
+            
+        kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
+        print(kernel.to_kern())
     last_kern = trans.kernels[-1]
     resshape = first_arr.shape
     shape = first_arr.shape
