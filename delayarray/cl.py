@@ -249,6 +249,7 @@ def run_gpu(numpy_ex):
     else:
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
 
+    scalar_dtypes.append(None)
     # scheduling
     events = []
     for kernel in trans.kernels:
