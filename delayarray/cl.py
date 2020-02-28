@@ -148,7 +148,6 @@ class GPUEmitter(num.NumpyVisitor):
         return (node.val, {}, [], [])
 
     def visit_MVEx(self, node, callshape=None):
-        print("visit_MVEx")
         curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
         right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
@@ -175,9 +174,7 @@ class GPUEmitter(num.NumpyVisitor):
         d = {**lin, **rin}
         d["num_rows_A"] = node.arg1.array.shape[0]
         d["num_cols_A"] = node.arg1.array.shape[1]
-        for i in d:
-            print(i)
-
+        
         kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d)
         
         if callshape is None or callshape != node.shape:
@@ -187,7 +184,6 @@ class GPUEmitter(num.NumpyVisitor):
             return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
                 
     def visit_MMEx(self, node, callshape=None):
-        print("visit_MMEx")
         curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
         right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
@@ -213,8 +209,6 @@ class GPUEmitter(num.NumpyVisitor):
         d = {**lin, **rin}
         d["num_rows_A"] = node.arg1.array.shape[0]
         d["num_cols_A"] = node.arg1.array.shape[1]
-        for i in d:
-            print(i)
         
         kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d)
     
@@ -260,7 +254,6 @@ def run_gpu(numpy_ex):
                 scalar_dtypes.append(None)
 
 #        kernel.set_scalar_arg_dtypes(scalar_dtypes)
-        print(kernel.to_kern())
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
 
@@ -293,11 +286,13 @@ def run_gpu(numpy_ex):
     for kernel in trans.kernels:
         group_shape = (64,)
         inputs = [bufs[key] for key in kernel.inputs.keys()]
+        print(kernel)
         events.append(kernel.prog.foo(queue,
                                       shape,
                                       group_shape,
                                       *inputs,
                                       bufs[kernel.name]))
-    res_np = np.empty(resshape).astype(np.float32)
+
+    res_np = np.empty(resshape,dtype=np.float32)
     cl.enqueue_copy(queue, res_np, bufs[last_kern.name], wait_for=events)
     return res_np
