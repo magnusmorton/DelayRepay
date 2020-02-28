@@ -97,18 +97,22 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         args = [arg_to_numpy_ex(arg) for arg in inputs]
         return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=BinaryNumpyEx(args[0], args[1], ufunc))
 
+    def _dot_mv(self, args, kwargs):
+        return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=MVEx(args[0], args[1]))
+
+    def _dot_mm(self, args, kwargs):
+        return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=MMEx(args[0], args[1]))
+    
     def _dot(self, args, kwargs):
         # scalar result dot
         args = [arg_to_numpy_ex(arg) for arg in args]
-        if (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 and args[1].array.shape[1] > 1):
-            return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=MMEx(args[0], args[1]))
-            # matrix x matrix
-        elif (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 or args[1].array.shape[1] > 1):
-            return DelayArray((args[0].array.shape[0],), ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1]))
-            # matrix x vector
-        elif (args[0].array.shape[0] > 1 or args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 or args[1].array.shape[1] > 1):
-            res = np.array(DelayArray((1,), ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
-            # vector x vector
+        if (len(args[0].array.shape) > 1 and len(args[1].array.shape) > 1):
+            if (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 and args[1].array.shape[1] > 1):
+                return self._dot_mm(args, kwargs)
+            elif (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 or args[1].array.shape[1] > 1):
+                return self._dot_mv(args, kwargs)
+            else:
+                assert(false)
         else:
             print("scalar?")
             

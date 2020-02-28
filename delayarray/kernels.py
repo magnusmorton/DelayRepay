@@ -68,8 +68,8 @@ if (local_id == 0) {{
 }}
 """
 
-gemv = """
 
+"""
 //spawn N threads in only dimension 0, N is dividable by num_rows_A
 //like if N is 16, then valid number is 1,2,4,8,16
 __kernel void naive_matrix_vector_mul(const __global float * restrict A,
@@ -78,22 +78,18 @@ __kernel void naive_matrix_vector_mul(const __global float * restrict A,
 			      const int num_rows_A,
 			      const int num_cols_A
 			      ) {
-
+"""
+gemv = """
 	// make sure spawn a good number of threads, so can be cut evenly
 	size_t const num_rows_per_thread = num_rows_A / get_global_size(0);
 	size_t const row_start = get_global_id(0) * num_rows_per_thread ;
 	size_t const row_end = ( get_global_id(0) + 1 ) * num_rows_per_thread ;
 
-	for(int i = row_start; i < row_end; ++i ) {
-		
-		C[i] = 0;
-
+	for(int i = row_start; i < row_end; ++i ) {{
+		{}[i] = 0; //C
 		for( int j = 0; j < num_cols_A; ++j )
-			 C[i] += A[ i * num_cols_A + j ] * B[j];
-
-	}
-	
-}
+			 {}[i] += {}[ i * num_cols_A + j ] * {}[j]; // C A B
+	}}	
 """
 
 gemm = """
@@ -117,15 +113,12 @@ kernel void naive_matrix_vector_mul(const global float * restrict A,
 			      const int num_rows_A,
 			      const int num_cols_A
 			      ) {
-
 	size_t work_group_id = get_group_id(0);
 	size_t local_thread_id = get_local_id(0);
 
 	float res = 0;
 	for( int i = 0; i< num_cols_A ; ++i )
-		res +=  A[ work_group_id * num_cols_A + i ] * B[ local_thread_id + i * num_rows_A ];
+		res +=  {}[ work_group_id * num_cols_A + i ] * {}[ local_thread_id + i * num_rows_A ];
 
-	C[work_group_id * num_cols_A + local_thread_id] = res;
-
-
+        {}[work_group_id * num_cols_A + local_thread_id] = res;
 """

@@ -32,6 +32,11 @@ class MMExpression(Expression):
     arg2: Expression
 
 @dataclass
+class MVExpression(Expression):
+    arg1: Expression
+    arg2: Expression
+
+@dataclass
 class BinaryExpression(Expression):
     op: str
     left: Expression
@@ -142,6 +147,45 @@ class GPUEmitter(num.NumpyVisitor):
     def visit_Scalar(self, node, callshape=None):
         return (node.val, {}, [], [])
 
+    def visit_MVEx(self, node, callshape=None):
+        print("visit_MVEx")
+        curr_visit = self.visits
+        left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
+        right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
+
+        if lstmts == []:
+            if left.endswith('[i]'):
+                left = left[:-3]
+
+        if rstmts == []:
+            if right.endswith('[i]'):
+                right = right[:-3]
+
+        name = "var{}".format(curr_visit)
+        stmts = []
+        for local in llocals + rlocals:
+            stmts.append("float {};".format(local))
+
+        outvar = name
+        if callshape is None or callshape != node.shape:
+            outvar = "output"
+            
+        stmt = kernels.gemv.format(outvar, outvar, left, right)
+
+        d = {**lin, **rin}
+        d["num_rows_A"] = node.arg1.array.shape[0]
+        d["num_cols_A"] = node.arg1.array.shape[1]
+        for i in d:
+            print(i)
+
+        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d)
+        
+        if callshape is None or callshape != node.shape:
+            self.kernels.append(kernel)
+            return (name, {name: kernel}, [], [])
+        else:
+            return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
+                
     def visit_MMEx(self, node, callshape=None):
         print("visit_MMEx")
         curr_visit = self.visits
@@ -155,10 +199,7 @@ class GPUEmitter(num.NumpyVisitor):
         if rstmts == []:
             if right.endswith('[i]'):
                 right = right[:-3]
-            
-        
-        print("visit_MMEx2")
-        
+                    
         name = "var{}".format(curr_visit)
         stmts = []
         for local in llocals + rlocals:
@@ -201,6 +242,7 @@ def run_gpu(numpy_ex):
     mf = cl.mem_flags
     bufs = {}
 
+    scalar_dtypes = []
     # allocating memory
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
@@ -209,6 +251,10 @@ def run_gpu(numpy_ex):
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
+                scalar_dtypes.append(None)
+            elif isinstance(source, int):
+                scalar_dtypes.append(np.uint32)
+                bufs[ref] = np.uint32(source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
                 scalar_dtypes.append(None)
@@ -216,9 +262,22 @@ def run_gpu(numpy_ex):
 #        kernel.set_scalar_arg_dtypes(scalar_dtypes)
         print(kernel.to_kern())
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
-        print(kernel.to_kern())
     last_kern = trans.kernels[-1]
-    resshape = first_arr.shape
+
+    sizes = []
+    for i in kernel.inputs:
+        if (isinstance(kernel.inputs[i], np.ndarray)):
+            sizes.append(kernel.inputs[i].shape)
+
+    # This is very hacky and really needs to change
+    # Basically just getting the correct result shape 
+    if len(sizes) == 2:
+        if sizes[0] != sizes[1]:
+            resshape = (sizes[0][0], sizes[1][1])
+    else:
+        resshape = first_arr.shape
+    #resshape = first_arr.shape
+
     shape = first_arr.shape
     if len(shape) > 1:
         shape = (shape[0] * shape[1],)
