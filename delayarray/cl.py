@@ -145,7 +145,6 @@ class GPUEmitter(num.NumpyVisitor):
         return (name+"[i]", {name: kernel})
 
 def run_gpu(numpy_ex):
-    print(numpy_ex)
     trans = GPUEmitter()
     trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
     ctx = cl.create_some_context()
@@ -157,6 +156,7 @@ def run_gpu(numpy_ex):
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
                 # TODO: fix sizing;get rid of first_arr
+                print("source contiguous: {}".format(source.flags['C_CONTIGUOUS']))
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)

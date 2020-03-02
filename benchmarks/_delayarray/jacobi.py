@@ -33,3 +33,7 @@ def time_jacobi():
 
     print("x:")
     print(sol)
+
+
+if __name__ == '__main__':
+    time_jacobi()
