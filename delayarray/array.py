@@ -60,6 +60,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
                 strides=None, order=None, parent=None, ops=None, ex=None):
         self = super(DelayArray, cls).__new__(cls)
         if buffer is not None:
+            print(buffer.flags['C_CONTIGUOUS'])
             self._ndarray = buffer
             self.ex = NPArray(buffer)
         elif ops is None:
@@ -160,7 +161,8 @@ def func_to_numpy_ex(func):
 @implements(np.diag)
 def diag(arr, k=0):
     if isinstance(arr.ex, NPArray):
-        arr._ndarray = np.diag(arr._ndarray, k)
+        arr._ndarray = np.ascontiguousarray(np.diag(arr._ndarray, k))
+        assert(arr._ndarray.flags['C_CONTIGUOUS'])
         arr.ex = NPArray(arr._ndarray)
         return arr
     else:
