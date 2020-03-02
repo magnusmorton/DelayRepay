@@ -236,7 +236,6 @@ def run_gpu(numpy_ex):
     mf = cl.mem_flags
     bufs = {}
 
-    scalar_dtypes = []
     # allocating memory
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
@@ -245,15 +244,11 @@ def run_gpu(numpy_ex):
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
-                scalar_dtypes.append(None)
             elif isinstance(source, int):
-                scalar_dtypes.append(np.uint32)
                 bufs[ref] = np.uint32(source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-                scalar_dtypes.append(None)
 
-#        kernel.set_scalar_arg_dtypes(scalar_dtypes)
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
     last_kern = trans.kernels[-1]
 
@@ -280,7 +275,6 @@ def run_gpu(numpy_ex):
     else:
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
 
-    scalar_dtypes.append(None)
     # scheduling
     events = []
     for kernel in trans.kernels:
