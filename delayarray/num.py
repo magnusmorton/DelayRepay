@@ -9,10 +9,12 @@ import numpy as np
 logger = logging.getLogger("delayRepay.num")
 
 OPS = {
-        'matmul': '@',
-        'add': '+',
-        'multiply': '*'
-        }
+    'matmul': '@',
+    'add': '+',
+    'multiply': '*',
+    'subtract': '-',
+    'true_divide': '/'
+}
 
 @dataclass
 class NumpyEx:
