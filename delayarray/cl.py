@@ -231,7 +231,6 @@ class GPUEmitter(num.NumpyVisitor):
         return (name+"[i]", {name: kernel})
 
 def run_gpu(numpy_ex):
-    print(numpy_ex)
     trans = GPUEmitter()
     trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
     ctx = cl.create_some_context()
@@ -272,7 +271,6 @@ def run_gpu(numpy_ex):
     # #resshape = first_arr.shape
 
     resshape = last_kern.shape
-    print(resshape)
     shape = first_arr.shape
     if len(shape) > 1:
         shape = (shape[0] * shape[1],)
