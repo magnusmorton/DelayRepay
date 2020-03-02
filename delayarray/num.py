@@ -248,7 +248,12 @@ class ShapeAnnotator(NumpyVisitor):
             return left
         if op.__name__ == 'dot':
             # for now
-            return (0,)
+            if len(left) > 1 and len(right) > 1:
+                return (left[0], right[1])
+            elif len(left) > 1:
+                return (left[0],)
+            else:
+                return (0,)
 
     def visit_BinaryNumpyEx(self, node):
         left = self.visit(node.left)
