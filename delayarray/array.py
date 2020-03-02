@@ -98,13 +98,15 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=BinaryNumpyEx(args[0], args[1], ufunc))
 
     def _dot_mv(self, args, kwargs):
-        return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=MVEx(args[0], args[1]))
+        return DelayArray((args[0].array.shape[0], ), ops=(np.dot, args, kwargs), ex=MVEx(args[0], args[1]))
 
     def _dot_mm(self, args, kwargs):
         return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=MMEx(args[0], args[1]))
     
     def _dot(self, args, kwargs):
         # scalar result dot
+        for arg in args:
+            print(arg.shape)
         args = [arg_to_numpy_ex(arg) for arg in args]
         if (len(args[0].array.shape) > 1 and len(args[1].array.shape) > 1):
             if (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 and args[1].array.shape[1] > 1):
@@ -115,7 +117,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
                 assert(false)
         else:
             print("scalar?")
-            
+            return self._dot_mv(args, kwargs)
         res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
         return np.sum(res)
 

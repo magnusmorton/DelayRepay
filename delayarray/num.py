@@ -297,8 +297,7 @@ class ReduceTransformer(NumpyVisitor):
         right = self.visit(node.arg2)
         if (len(left.array.shape) > 1 and len(right.array.shape) > 1):
             if (left.array.shape[0] > 1 and left.array.shape[1] > 1) and (right.array.shape[0] > 1 and right.array.shape[1] > 1):
-                # matrix x matrix
-                print("matrix x matrix")
+                # print("matrix x matrix")
                 muls = DotEx(left, right)
                 muls.shape = (left.array.shape[0],right.array.shape[0])
                 return muls
