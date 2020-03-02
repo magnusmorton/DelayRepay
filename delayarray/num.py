@@ -12,7 +12,8 @@ OPS = {
     'matmul': '@',
     'add': '+',
     'multiply': '*',
-    'subtract': '-'
+    'subtract': '-',
+    'true_divide': '/'
 }
 
 @dataclass
