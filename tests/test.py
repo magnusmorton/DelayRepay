@@ -96,6 +96,15 @@ class TestMatrix(unittest.TestCase):
         print(res)
         print(test)
         self.assertEqual(res, test)
+
+    def test_kuba(self):
+        a = full((4,64),10.0,dtype=np.float32)
+        b = full((64,),2.0,dtype=np.float32)
+        an = np.full((4,64),10.0,dtype=np.float32)
+        bn = np.full((64,),2.0,dtype=np.float32)
+        print(a @ b)
+        print(an @ bn)
+        
         
 if __name__ == '__main__':
     unittest.main()
