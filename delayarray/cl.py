@@ -244,8 +244,6 @@ def run_gpu(numpy_ex):
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
-                # TODO: fix sizing;get rid of first_arr
-                print("source contiguous: {}".format(source.flags['C_CONTIGUOUS']))
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
