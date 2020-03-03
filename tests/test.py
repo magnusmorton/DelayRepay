@@ -5,7 +5,7 @@ from delayarray import ones, array, full,  ReduceTransformer
 import numpy as np
 import numpy.testing as npt
 
-SIZE = 64
+SIZE = 10240
 class TestElWise(unittest.TestCase):
     # pylint: disable=C
     
