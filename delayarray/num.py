@@ -37,12 +37,6 @@ def calc_shape(left, right, op=None):
 class NumpyEx:
     '''Numpy expression'''
 
-class DotEx(NumpyEx):
-    def __init__(self, arg1, arg2):
-        self.arg1 = arg1,
-        self.arg2 = arg2
-
-
 class Funcable:
     def to_op(self):
         return OPS[self.func.__name__]
@@ -75,6 +69,7 @@ class MMEx(NumpyEx, Funcable):
     def __init__(self, arg1, arg2):
         self.arg1 = arg1
         self.arg2 = arg2
+        self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
 
 class MVEx(NumpyEx, Funcable):
     # arg1: NumpyEx
@@ -82,6 +77,7 @@ class MVEx(NumpyEx, Funcable):
     def __init__(self, arg1, arg2):
         self.arg1 = arg1
         self.arg2 = arg2
+        self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
     
 class DotEx(NumpyEx, Funcable):
    # left: NumpyEx
@@ -91,6 +87,8 @@ class DotEx(NumpyEx, Funcable):
         self.arg1 = left
         self.arg2 = right
         self.shape = calc_shape(left.shape, right.shape, np.dot)
+        self._inshape  = left.shape
+
 # @dataclass
 # class Dot(BinaryNumpyEx):
 #     '''np.dot func'''
@@ -263,10 +261,14 @@ class NumpyVisitor(Visitor):
 
     # def __str__(self):
         # return self._cpu()
+def is_matrix_matrix(left, right):
+    return len(left) > 1 and len(right) > 1
 
 
 def is_matrix_vector(left, right):
-    return len(left) > 1 and len(right) == 0
+    print(len(left))
+    print(len(right))
+    return len(left) > 1 and len(right) == 1
 
 class ShapeAnnotator(NumpyVisitor):
 
