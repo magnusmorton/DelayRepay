@@ -244,6 +244,7 @@ def run_gpu(numpy_ex):
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
+                print("input shape: {}".format(source.shape))
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
