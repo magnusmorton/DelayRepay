@@ -281,7 +281,6 @@ def run_gpu(numpy_ex):
     # todo fixme
     if last_kern.reducing:
         resshape = (resshape[0] // 64,)
-        assert(false)
         res_np = np.empty(resshape,dtype=np.float32)
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
     else:
