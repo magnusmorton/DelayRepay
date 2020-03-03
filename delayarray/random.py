@@ -3,3 +3,5 @@ import numpy.random
 from .array import cast
 
 rand = cast(numpy.random.rand)
+randn = cast(numpy.random.randn)
+random = cast(numpy.random.random)

@@ -1,7 +1,6 @@
 '''Delay array and related stuff'''
 
 import logging
-from dataclasses import dataclass
 from typing import List, Any
 import numpy as np
 import numpy.lib.mixins
@@ -60,7 +59,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
                 strides=None, order=None, parent=None, ops=None, ex=None):
         self = super(DelayArray, cls).__new__(cls)
         if buffer is not None:
-            print(buffer.flags['C_CONTIGUOUS'])
             self._ndarray = buffer
             self.ex = NPArray(buffer)
         elif ops is None:
@@ -116,18 +114,21 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     
     def _dot(self, args, kwargs):
         # scalar result dot
-        for arg in args:
-            print(arg.shape)
         args = [arg_to_numpy_ex(arg) for arg in args]
-        if (len(args[0].array.shape) > 1 and len(args[1].array.shape) > 1):
-            if (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 and args[1].array.shape[1] > 1):
-                return self._dot_mm(args, kwargs)
-            elif (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 or args[1].array.shape[1] > 1):
-                return self._dot_mv(args, kwargs)
-            else:
-                assert(false)
-        else:
-            print("scalar?")
+        # if (len(args[0].array.shape) > 1 and len(args[1].array.shape) > 1):
+        #     if (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 and args[1].array.shape[1] > 1):
+        #         return self._dot_mm(args, kwargs)
+        #     elif (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 or args[1].array.shape[1] > 1):
+        #         return self._dot_mv(args, kwargs)
+        #     else:
+        #         assert(false)
+        # else:
+        #     print("scalar?")
+        #     return self._dot_mv(args, kwargs)
+        print(args)
+        if is_matrix_matrix(args[0].shape, args[1].shape):
+            return self._dot_mm(args, kwargs)
+        if is_matrix_vector(args[0].shape, args[1].shape):
             return self._dot_mv(args, kwargs)
         res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
         return np.sum(res)
