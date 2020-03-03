@@ -1,4 +1,4 @@
-# Argument after * must be an iterable, not a DelayArray: hasting(y, args)
+# Must be subscriptable
 
 #from: http://wiki.scipy.org/Cookbook/Theoretical_Ecology/Hastings_and_Powell
 #setup: import numpy as np ; y = np.random.rand(3) ; args = np.random.rand(7)
@@ -6,7 +6,7 @@
 
 #pythran export hasting(float [], float, float, float, float, float, float, float)
 import numpy as np
-from delayarray import zeros, diag, diagflat
+from delayarray import zeros, diag, diagflat, empty
 from delayarray.random import rand
 
 def hasting(y, t, a1, a2, b1, b2, d1, d2):
@@ -17,5 +17,5 @@ def hasting(y, t, a1, a2, b1, b2, d1, d2):
     return yprime
 
 y = rand(3)
-args = rand(7)
+args = np.random.rand(7)
 hasting(y, *args)
