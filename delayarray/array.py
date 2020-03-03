@@ -1,7 +1,6 @@
 '''Delay array and related stuff'''
 
 import logging
-from dataclasses import dataclass
 from typing import List, Any
 import numpy as np
 import numpy.lib.mixins

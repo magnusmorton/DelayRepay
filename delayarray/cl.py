@@ -232,7 +232,7 @@ class GPUEmitter(num.NumpyVisitor):
 
 def run_gpu(numpy_ex):
     trans = GPUEmitter()
-    trans.walk(num.ReduceTransformer().visit(num.ShapeAnnotator().visit(numpy_ex)))
+    trans.walk(num.ReduceTransformer().visit(numpy_ex))
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags

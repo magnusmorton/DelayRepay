@@ -91,6 +91,7 @@ class DotEx(NumpyEx, Funcable):
         self.arg1 = left
         self.arg2 = right
         self.shape = calc_shape(left.shape, right.shape, np.dot)
+        self._inshape  = left.shape
 # @dataclass
 # class Dot(BinaryNumpyEx):
 #     '''np.dot func'''
