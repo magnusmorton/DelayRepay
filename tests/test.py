@@ -101,6 +101,12 @@ class TestMatrix(unittest.TestCase):
         bn = np.full((64,), 2.0, dtype=np.float32)
         npt.assert_array_almost_equal(a @ b, an @ bn)
 
+    def test_gemm(self):
+        res = self.mat @ self.mat
+        print(res)
+        print(self.np_mat @ self.np_mat)
+        npt.assert_array_almost_equal(res, self.np_mat @ self.np_mat)
+
 
 if __name__ == '__main__':
     unittest.main()
