@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from numbers import Number
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import delayarray.num as num
 import delayarray.kernels as kernels
@@ -96,6 +96,7 @@ class CLKernel:
     name: str
     body: str
     inputs: Dict
+    shape: Tuple[int]
     reducing: bool = False
 
     def to_kern(self):
@@ -132,7 +133,7 @@ class GPUEmitter(num.NumpyVisitor):
             outvar = "output[i]"
         stmt = "{} = {} {} {};".format(outvar, left, op, right)
         # I've made this too complicated for myself
-        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), {**lin, **rin})
+        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), {**lin, **rin}, node.shape)
         if callshape is None or callshape != node.shape:
             self.kernels.append(kernel)
             return (name+"[i]", {name: kernel}, [], [])
@@ -148,6 +149,7 @@ class GPUEmitter(num.NumpyVisitor):
         return (node.val, {}, [], [])
 
     def visit_MVEx(self, node, callshape=None):
+        print("vvisiting GeMV:")
         curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
         right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
@@ -175,7 +177,7 @@ class GPUEmitter(num.NumpyVisitor):
         d["num_rows_A"] = node.arg1.array.shape[0]
         d["num_cols_A"] = node.arg1.array.shape[1]
         
-        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d)
+        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d, node.shape)
         
         if callshape is None or callshape != node.shape:
             self.kernels.append(kernel)
@@ -210,7 +212,7 @@ class GPUEmitter(num.NumpyVisitor):
         d["num_rows_A"] = node.arg1.array.shape[0]
         d["num_cols_A"] = node.arg1.array.shape[1]
         
-        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d)
+        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d, node.shape)
     
         if callshape is None or callshape != node.shape:
             self.kernels.append(kernel)
@@ -224,7 +226,7 @@ class GPUEmitter(num.NumpyVisitor):
         decls = ["float {};".format(local) for local in mlocals]
         stmt = kernels.mag_sum.format(arg)
         name = "input{}".format(curr_visit)
-        kernel = CLKernel(name, "\n".join(decls + stmts + [stmt]), input_arg, reducing=True)
+        kernel = CLKernel(name, "\n".join(decls + stmts + [stmt]), input_arg, node.shape, reducing=True)
         self.kernels.append(kernel)
         return (name+"[i]", {name: kernel})
 
@@ -236,11 +238,14 @@ def run_gpu(numpy_ex):
     mf = cl.mem_flags
     bufs = {}
 
+    if trans.kernels == []:
+        raise Exception("No kernels...")
     # allocating memory
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
                 # TODO: fix sizing;get rid of first_arr
+                print("source contiguous: {}".format(source.flags['C_CONTIGUOUS']))
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
@@ -248,10 +253,10 @@ def run_gpu(numpy_ex):
                 bufs[ref] = np.uint32(source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
-
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
-    last_kern = trans.kernels[-1]
 
+    last_kern = trans.kernels[-1]
+        
     sizes = []
     for i in kernel.inputs:
         if (isinstance(kernel.inputs[i], np.ndarray)):
@@ -259,34 +264,37 @@ def run_gpu(numpy_ex):
 
     # This is very hacky and really needs to change
     # Basically just getting the correct result shape 
-    if len(sizes) == 2:
-        if sizes[0] != sizes[1]:
-            resshape = (sizes[0][0], sizes[1][1])
-    else:
-        resshape = first_arr.shape
-    #resshape = first_arr.shape
+    # if len(sizes) == 2:
+    #     if sizes[0] != sizes[1]:
+    #         resshape = (sizes[0][0],)
+    # else:
+    #     resshape = first_arr.shape
+    # #resshape = first_arr.shape
 
+    resshape = last_kern.shape
     shape = first_arr.shape
     if len(shape) > 1:
         shape = (shape[0] * shape[1],)
+
+    # todo fixme
     if last_kern.reducing:
         resshape = (resshape[0] // 64,)
+        res_np = np.empty(resshape,dtype=np.float32)
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
     else:
-        bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+        res_np = np.empty(resshape,dtype=np.float32)
+        bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
 
     # scheduling
     events = []
     for kernel in trans.kernels:
         group_shape = (64,)
         inputs = [bufs[key] for key in kernel.inputs.keys()]
-        print(kernel)
         events.append(kernel.prog.foo(queue,
                                       shape,
                                       group_shape,
                                       *inputs,
                                       bufs[kernel.name]))
 
-    res_np = np.empty(resshape,dtype=np.float32)
     cl.enqueue_copy(queue, res_np, bufs[last_kern.name], wait_for=events)
     return res_np

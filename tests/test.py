@@ -77,7 +77,6 @@ class TestVector(unittest.TestCase):
         self.assertEqual(res, test)
 
 
-
 class TestMatrix(unittest.TestCase):
 
     def setUp(self):
@@ -93,9 +92,15 @@ class TestMatrix(unittest.TestCase):
     def test_matvec(self):
         res = self.mat @ self.vec
         test = self.np_mat @ self.np_vec
-        print(res)
-        print(test)
-        self.assertEqual(res, test)
-        
+        npt.assert_array_almost_equal(res, test)
+
+    def test_kuba(self):
+        a = full((64, 64), 10.0, dtype=np.float32)
+        b = full((64,), 2.0, dtype=np.float32)
+        an = np.full((64, 64), 10.0, dtype=np.float32)
+        bn = np.full((64,), 2.0, dtype=np.float32)
+        npt.assert_array_almost_equal(a @ b, an @ bn)
+
+
 if __name__ == '__main__':
     unittest.main()

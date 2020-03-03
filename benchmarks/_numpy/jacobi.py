@@ -10,6 +10,8 @@ def jacobi(A,b,N=25,x=None):
     # Create a vector of the diagonal elements of A                                                                                                                                                
     # and subtract them from A                                                                                                                                                                     
     D = diag(A)
+    print(D.shape)
+    print(diagflat(D).flags['C_CONTIGUOUS'])
     R = A - diagflat(D)
 
     # Iterate for N times                                                                                                                                                                          
@@ -32,3 +34,6 @@ def time_jacobi():
 
     print("x:")
     print(sol)
+
+if __name__=='__main__':
+    time_jacobi()

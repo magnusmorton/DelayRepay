@@ -9,10 +9,12 @@ import numpy as np
 logger = logging.getLogger("delayRepay.num")
 
 OPS = {
-        'matmul': '@',
-        'add': '+',
-        'multiply': '*'
-        }
+    'matmul': '@',
+    'add': '+',
+    'multiply': '*',
+    'subtract': '-',
+    'true_divide': '/'
+}
 
 @dataclass
 class NumpyEx:
@@ -248,7 +250,12 @@ class ShapeAnnotator(NumpyVisitor):
             return left
         if op.__name__ == 'dot':
             # for now
-            return (0,)
+            if len(left) > 1 and len(right) > 1:
+                return (left[0], right[1])
+            elif len(left) > 1:
+                return (left[0],)
+            else:
+                return (0,)
 
     def visit_BinaryNumpyEx(self, node):
         left = self.visit(node.left)
@@ -292,8 +299,7 @@ class ReduceTransformer(NumpyVisitor):
         right = self.visit(node.arg2)
         if (len(left.array.shape) > 1 and len(right.array.shape) > 1):
             if (left.array.shape[0] > 1 and left.array.shape[1] > 1) and (right.array.shape[0] > 1 and right.array.shape[1] > 1):
-                # matrix x matrix
-                print("matrix x matrix")
+                # print("matrix x matrix")
                 muls = DotEx(left, right)
                 muls.shape = (left.array.shape[0],right.array.shape[0])
                 return muls

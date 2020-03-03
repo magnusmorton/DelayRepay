@@ -43,17 +43,28 @@ def calc_type(func, type1, type2):
     else:
         return type1
 
-    
+
+HANDLED_FUNCTIONS = {}
+
+
+def implements(np_function):
+    "Register an __array_function__ implementation for DiagonalArray objects."
+    def decorator(func):
+        HANDLED_FUNCTIONS[np_function] = func
+        return func
+    return decorator
+
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __new__(cls, shape, dtype='float32', buffer=None, offset=0,
                 strides=None, order=None, parent=None, ops=None, ex=None):
         self = super(DelayArray, cls).__new__(cls)
         if buffer is not None:
+            print(buffer.flags['C_CONTIGUOUS'])
             self._ndarray = buffer
             self.ex = NPArray(buffer)
         elif ops is None:
-            self._ndarray = np.ndarray(shape, dtype, buffer, offset, strides, order)
+            self._ndarray = np.ndarray(shape, dtype, buffer, offset, strides, order='C')
             self.ex = NPArray(self._ndarray)
         elif ex is not None:
             self.ex = ex
@@ -98,13 +109,15 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=BinaryNumpyEx(args[0], args[1], ufunc))
 
     def _dot_mv(self, args, kwargs):
-        return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=MVEx(args[0], args[1]))
+        return DelayArray((args[0].array.shape[0], ), ops=(np.dot, args, kwargs), ex=MVEx(args[0], args[1]))
 
     def _dot_mm(self, args, kwargs):
         return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=MMEx(args[0], args[1]))
     
     def _dot(self, args, kwargs):
         # scalar result dot
+        for arg in args:
+            print(arg.shape)
         args = [arg_to_numpy_ex(arg) for arg in args]
         if (len(args[0].array.shape) > 1 and len(args[1].array.shape) > 1):
             if (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 and args[1].array.shape[1] > 1):
@@ -115,18 +128,21 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
                 assert(false)
         else:
             print("scalar?")
-            
+            return self._dot_mv(args, kwargs)
         res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
         return np.sum(res)
 
 
     def __array_function__(self, func, types, args, kwargs):
+        print(func)
         self._logger.debug("array_function")
         self._logger.debug("func: {}".format(func))
 
         self._logger.debug("args: {}".format(type(args)))
         if func.__name__ == "dot":
             return self._dot(args, kwargs)
+        elif func in HANDLED_FUNCTIONS:
+            return HANDLED_FUNCTIONS[func](*args, **kwargs)
         else:
             return NotImplemented
 
@@ -161,6 +177,22 @@ def func_to_numpy_ex(func):
         'multiply': Multiply
         }[func.__name__]
 
+@implements(np.diag)
+def diag(arr, k=0):
+    if isinstance(arr.ex, NPArray):
+        arr._ndarray = np.ascontiguousarray(np.diag(arr._ndarray, k))
+        assert(arr._ndarray.flags['C_CONTIGUOUS'])
+        arr.ex = NPArray(arr._ndarray)
+        return arr
+    else:
+        return NotImplemented
+
+@implements(np.diagflat)
+@cast
+def diagflat(arr, k=0):
+    #keep it simple for now
+    return np.diagflat(np.asarray(arr, order='C'))
+    
 
 # Ones and zeros
 empty = cast(np.empty)
@@ -198,8 +230,6 @@ geomspace = cast(np.geomspace)
 
 
 # Building matrices
-diag = cast(np.diag)
-diagflat = cast(np.diagflat)
 tri = cast(np.tri)
 tril = cast(np.tril)
 triu = cast(np.triu)
