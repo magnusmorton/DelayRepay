@@ -5,7 +5,7 @@ from delayarray import ones, array, full,  ReduceTransformer
 import numpy as np
 import numpy.testing as npt
 
-SIZE = 10240
+SIZE = 64
 class TestElWise(unittest.TestCase):
     # pylint: disable=C
     
@@ -91,6 +91,7 @@ class TestMatrix(unittest.TestCase):
 
     def test_matvec(self):
         res = self.mat @ self.vec
+        print(res)
         test = self.np_mat @ self.np_vec
         npt.assert_array_almost_equal(res, test)
 
@@ -103,8 +104,6 @@ class TestMatrix(unittest.TestCase):
 
     def test_gemm(self):
         res = self.mat @ self.mat
-        print(res)
-        print(self.np_mat @ self.np_mat)
         npt.assert_array_almost_equal(res, self.np_mat @ self.np_mat)
 
 

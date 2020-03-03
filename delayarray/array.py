@@ -125,6 +125,11 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         # else:
         #     print("scalar?")
         #     return self._dot_mv(args, kwargs)
+        print(args)
+        if is_matrix_matrix(args[0].shape, args[1].shape):
+            return self._dot_mm(args, kwargs)
+        if is_matrix_vector(args[0].shape, args[1].shape):
+            return self._dot_mv(args, kwargs)
         res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
         return np.sum(res)
 

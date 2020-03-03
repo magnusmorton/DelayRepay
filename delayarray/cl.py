@@ -241,6 +241,7 @@ def run_gpu(numpy_ex):
     if trans.kernels == []:
         raise Exception("No kernels...")
     # allocating memory
+    print("KERNELS: {}".format(len(trans.kernels)))
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
@@ -251,6 +252,7 @@ def run_gpu(numpy_ex):
             elif isinstance(source, int):
                 bufs[ref] = np.uint32(source)
             else:
+                print(source.shape)
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
 
@@ -271,6 +273,7 @@ def run_gpu(numpy_ex):
     # #resshape = first_arr.shape
 
     resshape = last_kern.shape
+    print(resshape)
     shape = first_arr.shape
     if len(shape) > 1:
         shape = (shape[0] * shape[1],)
@@ -278,10 +281,12 @@ def run_gpu(numpy_ex):
     # todo fixme
     if last_kern.reducing:
         resshape = (resshape[0] // 64,)
+        assert(false)
         res_np = np.empty(resshape,dtype=np.float32)
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
     else:
         res_np = np.empty(resshape,dtype=np.float32)
+        print("BYTES: {}".format(res_np.nbytes))
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
 
     # scheduling
@@ -289,6 +294,8 @@ def run_gpu(numpy_ex):
     for kernel in trans.kernels:
         group_shape = (64,)
         inputs = [bufs[key] for key in kernel.inputs.keys()]
+        print(shape)
+        print(kernel.to_kern())
         events.append(kernel.prog.foo(queue,
                                       shape,
                                       group_shape,
