@@ -97,8 +97,8 @@ gemm = """
 	size_t local_thread_id = get_local_id(0);
 
 	float res = 0;
-	for( int i = 0; i< num_cols_A ; ++i )
-		res +=  {}[ work_group_id * num_cols_A + i ] * {}[ local_thread_id + i * num_rows_A ];
+	for( int j = 0; j< num_cols_A ; ++j )
+		res +=  {}[ work_group_id * num_cols_A + j ] * {}[ local_thread_id + j * num_rows_A ];
 
         {}[work_group_id * num_cols_A + local_thread_id] = res;
 """
