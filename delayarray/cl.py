@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 from numbers import Number
 from typing import List, Dict, Tuple
 
@@ -9,27 +8,52 @@ import pyopencl as cl
 import numpy as np
 
 logger = logging.getLogger("delayRepay.cl")
-preamble = "int i = get_global_id(0);"
+PREAMBLE = "int i = get_global_id(0);"
+PREAMBLE2D = """
+#define TILEX 4
+#define TILEX_SHIFT 2
+#define TILEY 4
+#define TILEY_SHIFT 2
+int2 pos = (int2)(get_global_id(0), get_global_id(1));
+"""
 
 
-@dataclass
 class CLKernel:
     name: str
     body: str
     inputs: Dict
     shape: Tuple[int]
     reducing: bool = False
+    
+    def __init__(self, name, body, inputs, shape, reducing=False):
+        self.name = name
+        self.body = body
+        self.inputs = inputs
+        self.shape = shape
+        self.reducing = reducing
+        self.preamble = PREAMBLE
 
     def to_kern(self):
-        out = "__kernel void {} ({}, __global float *output){{\n{}\n{}\n}}"
+        out = "__kernel void {} ({}, __global float4 *output){{\n{}\n{}\n}}"
         inargs = []
         for name in self.inputs.keys():
             if "var" in name:
-                inargs.append("__global const float* {}".format(name))
+                inargs.append("__global float4* {}".format(name))
             else:
-                inargs.append("const int {}".format(name))
-        return out.format("foo", ", ".join(inargs), preamble, self.body)
+                inargs.append("const uint {}".format(name))
+        return out.format("foo", ", ".join(inargs), self.preamble, self.body)
+    
 
+class Kernel2D(CLKernel):
+    '''
+    for 2D kernels
+    '''
+    def __init__(self, *args, **kwargs):
+
+        super(Kernel2D, self).__init__(*args, **kwargs)
+        self.preamble = PREAMBLE2D
+        self.global_shape = (self.shape[0] // 4, self.shape[1] // 4)   
+        
 
 class GPUEmitter(num.NumpyVisitor):
 
@@ -127,13 +151,14 @@ class GPUEmitter(num.NumpyVisitor):
         outvar = name
         if callshape is None or callshape != node.shape:
             outvar = "output"
-        stmt = kernels.gemm.format(left, right, outvar)
+        stmt = kernels.gemm_new.format(matrixA=left, matrixB=right, 
+matrixC=outvar)
 
         d = {**lin, **rin}
-        d["num_rows_A"] = node.arg1.array.shape[0]
         d["num_cols_A"] = node.arg1.array.shape[1]
-        
-        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d, node.shape)
+        d["num_cols_B"] = node.arg2.array.shape[1]
+        kernel = Kernel2D(name, "\n".join(stmts + lstmts + rstmts + [stmt]), d, 
+node.shape)
     
         if callshape is None or callshape != node.shape:
             self.kernels.append(kernel)
@@ -164,6 +189,7 @@ def run_gpu(numpy_ex):
     # allocating memory
     print("KERNELS: {}".format(len(trans.kernels)))
     for kernel in trans.kernels:
+        print(kernel.to_kern())     
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray):
                 print("input shape: {}".format(source.shape))
@@ -171,6 +197,7 @@ def run_gpu(numpy_ex):
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
             elif isinstance(source, int):
+                print("FOOOOOO")
                 bufs[ref] = np.uint32(source)
             else:
                 print(source.shape)
@@ -179,22 +206,7 @@ def run_gpu(numpy_ex):
 
     last_kern = trans.kernels[-1]
         
-    sizes = []
-    for i in kernel.inputs:
-        if (isinstance(kernel.inputs[i], np.ndarray)):
-            sizes.append(kernel.inputs[i].shape)
-
-    # This is very hacky and really needs to change
-    # Basically just getting the correct result shape 
-    # if len(sizes) == 2:
-    #     if sizes[0] != sizes[1]:
-    #         resshape = (sizes[0][0],)
-    # else:
-    #     resshape = first_arr.shape
-    # #resshape = first_arr.shape
-
     resshape = last_kern.shape
-    print(resshape)
     shape = first_arr.shape
     if len(shape) > 1:
         shape = (shape[0] * shape[1],)
@@ -206,7 +218,6 @@ def run_gpu(numpy_ex):
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
     else:
         res_np = np.empty(resshape,dtype=np.float32)
-        print("BYTES: {}".format(res_np.nbytes))
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
 
     # scheduling
@@ -214,11 +225,9 @@ def run_gpu(numpy_ex):
     for kernel in trans.kernels:
         group_shape = (64,)
         inputs = [bufs[key] for key in kernel.inputs.keys()]
-        print(shape)
-        print(kernel.to_kern())
         events.append(kernel.prog.foo(queue,
-                                      shape,
-                                      group_shape,
+                                      kernel.global_shape,
+                                      None,
                                       *inputs,
                                       bufs[kernel.name]))
 
