@@ -136,23 +136,6 @@ class NumpyVisitor(Visitor):
     '''Visits Numpy Expression'''
     def __init__(self):
         self.visits = 0
-    '''visitor ABC'''
-    # def visit(self, node):
-    #     '''generic visit'''
-    #     self.visits += 1
-    #     logger.debug("visiting {}. visits: {}".format(node, self.visits))
-    #     if isinstance(node, BinaryNumpyEx):
-    #         ret =  self.visit_binary(node)
-    #     elif isinstance(node, NPArray):
-    #         ret = self.visit_array(node)
-    #     elif isinstance(node, Var):
-    #         ret =  self.visit_var(node)
-    #     elif isinstance(node, Scalar):
-    #         ret =  self.visit_scalar(node)
-    #     else:
-    #         logger.critical("!!!!!Not Implemented!!!!!")
-    #         ret =  NotImplemented
-    #     return ret
 
     def visit(self, node, **kwargs):
         """Visit a node."""
