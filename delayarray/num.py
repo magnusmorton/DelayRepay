@@ -1,7 +1,6 @@
 '''Numpy abstractions'''
 
 import logging
-from dataclasses import dataclass
 from numbers import Number
 from typing import List, Tuple
 import numpy as np
