@@ -63,6 +63,7 @@ class BinaryNumpyEx(NumpyEx, Funcable):
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
 
+
 class MMEx(NumpyEx, Funcable):
     # arg1: NumpyEx
     # arg2: NumpyEx
@@ -71,6 +72,7 @@ class MMEx(NumpyEx, Funcable):
         self.arg2 = arg2
         self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
 
+
 class MVEx(NumpyEx, Funcable):
     # arg1: NumpyEx
     # arg2: NumpyEx
@@ -78,11 +80,10 @@ class MVEx(NumpyEx, Funcable):
         self.arg1 = arg1
         self.arg2 = arg2
         self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
-    
+
+
 class DotEx(NumpyEx, Funcable):
-   # left: NumpyEx
-   # right: NumpyEx
-   # func: np.dot
+
     def __init__(self, left, right):
         self.arg1 = left
         self.arg2 = right
@@ -90,7 +91,25 @@ class DotEx(NumpyEx, Funcable):
         self._inshape  = left.shape
 
 
-class NPArray(NumpyEx):
+class MemoMeta(type):
+    '''Metaclass implementing caching'''
+
+    def __new__(meta, *args, **kwargs):
+        print("META HELLO")
+        print(args)
+        cls = super(MemoMeta, meta).__new__(meta, *args, **kwargs)
+        cls._cache = {}
+        return cls
+
+    def __call__(cls, array):
+        print("META CALL")
+        print(id(array))
+        if id(array) not in cls._cache:
+            cls._cache[id(array)] = super(MemoMeta, cls).__call__(array)
+        return cls._cache[id(array)]
+
+
+class NPArray(NumpyEx, metaclass=MemoMeta):
     '''ndarray'''
 
     def __init__(self, array):
