@@ -162,18 +162,15 @@ def run_gpu(numpy_ex):
     if trans.kernels == []:
         raise Exception("No kernels...")
     # allocating memory
-    print("KERNELS: {}".format(len(trans.kernels)))
     for kernel in trans.kernels:
         for ref, source in kernel.inputs.items():
-            if isinstance(source, np.ndarray):
-                print("input shape: {}".format(source.shape))
+            if isinstance(source, np.ndarray) and ref not in bufs:
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
             elif isinstance(source, int):
                 bufs[ref] = np.uint32(source)
             else:
-                print(source.shape)
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
 
