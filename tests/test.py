@@ -1,14 +1,15 @@
 '''Test simple cl examples'''
 import unittest
-import logging
-from delayarray import ones, array, full,  ReduceTransformer
+from delayarray import ones, full
 import numpy as np
 import numpy.testing as npt
 
 SIZE = 10240
+
+
 class TestElWise(unittest.TestCase):
     # pylint: disable=C
-    
+
     def setUp(self):
         self.arr = ones(SIZE).astype(np.float32)
         self.np_arr = np.ones(SIZE).astype(np.float32)
@@ -32,7 +33,6 @@ class TestElWise(unittest.TestCase):
         res = axpy(8, self.arr, 9)
         npt.assert_array_almost_equal(res, axpy(8, self.np_arr, 9))
 
-
     def test_regression(self):
         fun = lambda mat: mat + mat * 3 + 9
         res = fun(self.arr)
@@ -51,7 +51,6 @@ class TestVector(unittest.TestCase):
         self.arr2 = full((SIZE,), 3).astype(np.float32)
         self.np_arr = np.full((SIZE,), 7).astype(np.float32)
         self.np_arr2 = np.full((SIZE,), 3).astype(np.float32)
-
 
     def test_vecadd(self):
         res = self.arr + self.arr2
@@ -80,9 +79,9 @@ class TestVector(unittest.TestCase):
 class TestMatrix(unittest.TestCase):
 
     def setUp(self):
-        self.mat = full((SIZE,SIZE), 7).astype(np.float32)
+        self.mat = full((SIZE, SIZE), 7).astype(np.float32)
         self.vec = full((SIZE,), 3).astype(np.float32)
-        self.np_mat = np.full((SIZE,SIZE), 7).astype(np.float32)
+        self.np_mat = np.full((SIZE, SIZE), 7).astype(np.float32)
         self.np_vec = np.full((SIZE,), 3).astype(np.float32)
 
     def test_scalar_mul(self):
