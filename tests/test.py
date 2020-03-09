@@ -1,6 +1,7 @@
 '''Test simple cl examples'''
 import unittest
 from delayarray import ones, full
+from delayarray.num import NPArray
 import numpy as np
 import numpy.testing as npt
 
@@ -104,6 +105,15 @@ class TestMatrix(unittest.TestCase):
     def test_gemm(self):
         res = self.mat @ self.mat
         npt.assert_array_almost_equal(res, self.np_mat @ self.np_mat)
+
+
+class TestMeta(unittest.TestCase):
+
+    def test_memoise(self):
+        arr = np.array([1, 2, 3])
+        ar1 = NPArray(arr)
+        ar2 = NPArray(arr)
+        self.assertIs(ar1, ar2)
 
 
 if __name__ == '__main__':
