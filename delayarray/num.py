@@ -1,9 +1,6 @@
 '''Numpy abstractions'''
 
 import logging
-from dataclasses import dataclass
-from numbers import Number
-from typing import List, Tuple
 import numpy as np
 
 logger = logging.getLogger("delayRepay.num")
@@ -34,8 +31,10 @@ def calc_shape(left, right, op=None):
         else:
             return (0,)
 
+
 class NumpyEx:
     '''Numpy expression'''
+
 
 class Funcable:
     def to_op(self):
@@ -56,7 +55,7 @@ class BinaryNumpyEx(NumpyEx, Funcable):
     # left: NumpyEx
     # right: NumpyEx
     # func: np.ufunc
-    
+
     def __init__(self, left, right, func):
         self.left = left
         self.right = right
@@ -88,7 +87,7 @@ class DotEx(NumpyEx, Funcable):
         self.arg1 = left
         self.arg2 = right
         self.shape = calc_shape(left.shape, right.shape, np.dot)
-        self._inshape  = left.shape
+        self._inshape = left.shape
 
 
 class MemoMeta(type):
@@ -171,7 +170,6 @@ class NumpyVisitor(Visitor):
         return self.visit(tree)
 
 
-
 def is_matrix_matrix(left, right):
     return len(left) > 1 and len(right) > 1
 
@@ -180,6 +178,7 @@ def is_matrix_vector(left, right):
     print(len(left))
     print(len(right))
     return len(left) > 1 and len(right) == 1
+
 
 class ShapeAnnotator(NumpyVisitor):
 
@@ -202,7 +201,9 @@ class ShapeAnnotator(NumpyVisitor):
     def visit_BinaryNumpyEx(self, node):
         left = self.visit(node.left)
         right = self.visit(node.right)
-        node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, node.func)
+        node.shape = ShapeAnnotator.calc_shape(left.shape,
+                                               right.shape,
+                                               node.func)
         return node
 
     def visit_NPArray(self, node):
@@ -221,13 +222,12 @@ class ShapeAnnotator(NumpyVisitor):
         return node
 
 
-    
 class ReduceTransformer(NumpyVisitor):
     def visit_DotEx(self, node):
         # TODO This is just for vector x vector
         left = self.visit(node.arg1)
         right = self.visit(node.arg2)
-        
+
         if is_matrix_vector(left.shape, right.shape):
             print("matrix x vector")
             return MVEx(left, right, node.shape, node._inshape)
