@@ -1,23 +1,24 @@
 '''Delay array and related stuff'''
 
 import logging
-from typing import List, Any
+from typing import Any
 import numpy as np
 import numpy.lib.mixins
-from .num import *
+import delayarray.num as num
 from .cl import run_gpu
+
 
 def cast(func):
     '''cast to Delay array decorator'''
     def wrapper(*args, **kwargs):
         arr = func(*args, **kwargs)
-        if not isinstance(arr,DelayArray):
+        if not isinstance(arr, DelayArray):
             arr = DelayArray(arr.shape, buffer=arr)
         return arr
     return wrapper
 
+
 def calc_shape(func, shape1, shape2):
-    
     if len(shape1) == 1:
         shape1 = (1,) + shape1
     if len(shape2) == 1:
@@ -32,8 +33,9 @@ def calc_shape(func, shape1, shape2):
         else:
             return (shape1[0], shape2[1])
 
+
 def calc_type(func, type1, type2):
-    if 'float64' in (type1,type2):
+    if 'float64' in (type1, type2):
         return 'float64'
     elif 'float32' in (type1, type2):
         return 'float32'
@@ -60,16 +62,17 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self = super(DelayArray, cls).__new__(cls)
         if buffer is not None:
             self._ndarray = buffer
-            self.ex = NPArray(buffer)
+            self.ex = num.NPArray(buffer)
         elif ops is None:
-            self._ndarray = np.ndarray(shape, dtype, buffer, offset, strides, order='C')
-            self.ex = NPArray(self._ndarray)
+            self._ndarray = np.ndarray(shape, dtype, buffer, offset, strides,
+                                       order='C')
+            self.ex = num.NPArray(self._ndarray)
         elif ex is not None:
             self.ex = ex
         else:
             # do type inference
             pass
-       
+
         self.shape = shape
         self.dtype = dtype
         self.parent = parent
@@ -80,17 +83,16 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __repr__(self):
         return str(self.__array__())
 
-
     def child(self, ops):
         return DelayArray(self.shape,  ops=ops)
-    
+
     def walk(self):
-        walker = NumpyWalker()
+        walker = num.NumpyWalker()
         return walker.walk(self)
 
     def __array__(self):
         # return NumpyFunction(self.ex)()
-        if isinstance(self.ex, NPArray):
+        if isinstance(self.ex, num.NPArray):
             return self.ex.array
         return run_gpu(self.ex)
 
@@ -104,35 +106,29 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             return self._dot(inputs, kwargs)
         # cls = func_to_numpy_ex(ufunc)
         args = [arg_to_numpy_ex(arg) for arg in inputs]
-        return DelayArray(self.shape, ops=(ufunc, inputs, kwargs), ex=BinaryNumpyEx(args[0], args[1], ufunc))
+        return DelayArray(self.shape, ops=(ufunc, inputs, kwargs),
+                          ex=num.BinaryNumpyEx(args[0], args[1], ufunc))
 
     def _dot_mv(self, args, kwargs):
-        return DelayArray((args[0].array.shape[0], ), ops=(np.dot, args, kwargs), ex=MVEx(args[0], args[1]))
+        return DelayArray((args[0].array.shape[0], ),
+                          ops=(np.dot, args, kwargs),
+                          ex=num.MVEx(args[0], args[1]))
 
     def _dot_mm(self, args, kwargs):
-        return DelayArray((args[0].array.shape[0], args[1].array.shape[1]), ops=(np.dot, args, kwargs), ex=MMEx(args[0], args[1]))
-    
+        return DelayArray((args[0].array.shape[0], args[1].array.shape[1]),
+                          ops=(np.dot, args, kwargs),
+                          ex=num.MMEx(args[0], args[1]))
+
     def _dot(self, args, kwargs):
         # scalar result dot
         args = [arg_to_numpy_ex(arg) for arg in args]
-        # if (len(args[0].array.shape) > 1 and len(args[1].array.shape) > 1):
-        #     if (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 and args[1].array.shape[1] > 1):
-        #         return self._dot_mm(args, kwargs)
-        #     elif (args[0].array.shape[0] > 1 and args[0].array.shape[1] > 1) and (args[1].array.shape[0] > 1 or args[1].array.shape[1] > 1):
-        #         return self._dot_mv(args, kwargs)
-        #     else:
-        #         assert(false)
-        # else:
-        #     print("scalar?")
-        #     return self._dot_mv(args, kwargs)
-        print(args)
-        if is_matrix_matrix(args[0].shape, args[1].shape):
+        if num.is_matrix_matrix(args[0].shape, args[1].shape):
             return self._dot_mm(args, kwargs)
-        if is_matrix_vector(args[0].shape, args[1].shape):
+        if num.is_matrix_vector(args[0].shape, args[1].shape):
             return self._dot_mv(args, kwargs)
-        res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs), ex=DotEx(args[0], args[1])))
+        res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs),
+                                  ex=num.DotEx(args[0], args[1])))
         return np.sum(res)
-
 
     def __array_function__(self, func, types, args, kwargs):
         print(func)
@@ -149,8 +145,8 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def astype(self, *args, **kwargs):
         self._ndarray = self._ndarray.astype(*args, **kwargs)
-        if isinstance(self.ex, NPArray):
-            self.ex = NPArray(self._ndarray)
+        if isinstance(self.ex, num.NPArray):
+            self.ex = num.NPArray(self._ndarray)
         else:
             raise Exception("Dont call astype here")
         return self
@@ -159,12 +155,12 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return np.dot(self, other)
 
 
-def arg_to_numpy_ex(arg:Any) -> NumpyEx:
+def arg_to_numpy_ex(arg: Any) -> num.NumpyEx:
     from numbers import Number
     if isinstance(arg, DelayArray):
         return arg.ex
     elif isinstance(arg, Number):
-        return Scalar(arg)
+        return num.Scalar(arg)
     else:
         print(arg)
         print(type(arg))
@@ -173,27 +169,29 @@ def arg_to_numpy_ex(arg:Any) -> NumpyEx:
 
 def func_to_numpy_ex(func):
     return {
-        'matmul': Matmul,
-        'add': Add,
-        'multiply': Multiply
+        'matmul': num.Matmul,
+        'add': num.Add,
+        'multiply': num.Multiply
         }[func.__name__]
+
 
 @implements(np.diag)
 def diag(arr, k=0):
-    if isinstance(arr.ex, NPArray):
+    if isinstance(arr.ex, num.NPArray):
         arr._ndarray = np.ascontiguousarray(np.diag(arr._ndarray, k))
         assert(arr._ndarray.flags['C_CONTIGUOUS'])
-        arr.ex = NPArray(arr._ndarray)
+        arr.ex = num.NPArray(arr._ndarray)
         return arr
     else:
         return NotImplemented
 
+
 @implements(np.diagflat)
 @cast
 def diagflat(arr, k=0):
-    #keep it simple for now
+    # keep it simple for now
     return np.diagflat(np.asarray(arr, order='C'))
-    
+
 
 # Ones and zeros
 empty = cast(np.empty)
