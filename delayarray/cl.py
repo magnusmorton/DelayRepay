@@ -62,7 +62,7 @@ class GPUEmitter(num.NumpyVisitor):
             return (name, {**lin, **rin},lstmts + rstmts + [stmt], [name] + llocals + rlocals)
 
     def visit_NPArray(self, node, callshape=None):
-        name = "var{}".format(self.visits)
+        name = "var{}".format(id(node))
         self.ins[name] = node.array
         return (name+"[i]", {name: node.array}, [], [])
 
