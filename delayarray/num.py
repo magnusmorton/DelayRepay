@@ -15,7 +15,6 @@ OPS = {
 
 
 def calc_shape(left, right, op=None):
-    print(left)
     if left == (0,):
         return right
     if right is (0,):
@@ -94,15 +93,11 @@ class MemoMeta(type):
     '''Metaclass implementing caching'''
 
     def __new__(meta, *args, **kwargs):
-        print("META HELLO")
-        print(args)
         cls = super(MemoMeta, meta).__new__(meta, *args, **kwargs)
         cls._cache = {}
         return cls
 
     def __call__(cls, array):
-        print("META CALL")
-        print(id(array))
         if id(array) not in cls._cache:
             cls._cache[id(array)] = super(MemoMeta, cls).__call__(array)
         return cls._cache[id(array)]
@@ -142,7 +137,6 @@ class Visitor:
         return visitor(node, **kwargs)
 
     def list_visit(self, lst):
-        print("list_visit")
         return [self.visit(node) for node in lst]
 
     def default_visit(self, node):

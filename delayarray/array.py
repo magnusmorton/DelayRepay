@@ -131,7 +131,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return np.sum(res)
 
     def __array_function__(self, func, types, args, kwargs):
-        print(func)
         self._logger.debug("array_function")
         self._logger.debug("func: {}".format(func))
 

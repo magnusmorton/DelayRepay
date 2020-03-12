@@ -70,7 +70,6 @@ class GPUEmitter(num.NumpyVisitor):
         return (node.val, {}, [], [])
 
     def visit_MVEx(self, node, callshape=None):
-        print("vvisiting GeMV:")
         curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
         right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
@@ -191,7 +190,6 @@ def run_gpu(numpy_ex):
     # #resshape = first_arr.shape
 
     resshape = last_kern.shape
-    print(resshape)
     shape = first_arr.shape
     if len(shape) > 1:
         shape = (shape[0] * shape[1],)
@@ -203,7 +201,6 @@ def run_gpu(numpy_ex):
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
     else:
         res_np = np.empty(resshape,dtype=np.float32)
-        print("BYTES: {}".format(res_np.nbytes))
         bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
 
     # scheduling
@@ -211,8 +208,6 @@ def run_gpu(numpy_ex):
     for kernel in trans.kernels:
         group_shape = (64,)
         inputs = [bufs[key] for key in kernel.inputs.keys()]
-        print(shape)
-        print(kernel.to_kern())
         events.append(kernel.prog.foo(queue,
                                       shape,
                                       group_shape,
