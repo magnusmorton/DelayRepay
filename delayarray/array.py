@@ -1,6 +1,5 @@
 '''Delay array and related stuff'''
 
-import logging
 from typing import Any
 import numpy as np
 import numpy.lib.mixins
@@ -77,7 +76,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self.dtype = dtype
         self.parent = parent
         self.ops = ops
-        self._logger = logging.getLogger("delayRepay.arr")
         return self
 
     def __repr__(self):
@@ -97,11 +95,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return run_gpu(self.ex)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        self._logger.debug("func: {}".format(ufunc))
-        self._logger.debug(method)
-        self._logger.debug(inputs)
-        if ufunc.__name__ == 'multiply':
-            self._logger.debug("FOO")
         if ufunc.__name__ == 'matmul':
             return self._dot(inputs, kwargs)
         # cls = func_to_numpy_ex(ufunc)
@@ -131,17 +124,10 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return np.sum(res)
 
     def __array_function__(self, func, types, args, kwargs):
-        self._logger.debug("array_function")
-        self._logger.debug("func: {}".format(func))
-
-        self._logger.debug("args: {}".format(type(args)))
         if func.__name__ == "dot":
             return self._dot(args, kwargs)
-        elif func in HANDLED_FUNCTIONS:
-            return HANDLED_FUNCTIONS[func](*args, **kwargs)
-        else:
-            return NotImplemented
-
+        return HANDLED_FUNCTIONS[func](*args, **kwargs)
+        
     def astype(self, *args, **kwargs):
         self._ndarray = self._ndarray.astype(*args, **kwargs)
         if isinstance(self.ex, num.NPArray):
