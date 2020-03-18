@@ -86,7 +86,7 @@ class GPUEmitter(num.NumpyVisitor):
             return (name, {**lin, **rin},lstmts + rstmts + [stmt], [name] + llocals + rlocals)
 
     def visit_NPArray(self, node, callshape=None):
-        name = "var{}".format(self.visits)
+        name = "var{}".format(id(node))
         self.ins[name] = node.array
         return (name+"[i]", {name: node.array}, [], [])
 
@@ -94,7 +94,6 @@ class GPUEmitter(num.NumpyVisitor):
         return (node.val, {}, [], [])
 
     def visit_MVEx(self, node, callshape=None):
-        print("vvisiting GeMV:")
         curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
         right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
@@ -187,12 +186,10 @@ def run_gpu(numpy_ex):
     if trans.kernels == []:
         raise Exception("No kernels...")
     # allocating memory
-    print("KERNELS: {}".format(len(trans.kernels)))
     for kernel in trans.kernels:
         print(kernel.to_kern())     
         for ref, source in kernel.inputs.items():
-            if isinstance(source, np.ndarray):
-                print("input shape: {}".format(source.shape))
+            if isinstance(source, np.ndarray) and ref not in bufs:
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
@@ -200,7 +197,6 @@ def run_gpu(numpy_ex):
                 print("FOOOOOO")
                 bufs[ref] = np.uint32(source)
             else:
-                print(source.shape)
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
 

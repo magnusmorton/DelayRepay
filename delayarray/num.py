@@ -1,8 +1,6 @@
 '''Numpy abstractions'''
 
 import logging
-from numbers import Number
-from typing import List, Tuple
 import numpy as np
 
 logger = logging.getLogger("delayRepay.num")
@@ -17,7 +15,6 @@ OPS = {
 
 
 def calc_shape(left, right, op=None):
-    print(left)
     if left == (0,):
         return right
     if right is (0,):
@@ -33,8 +30,10 @@ def calc_shape(left, right, op=None):
         else:
             return (0,)
 
+
 class NumpyEx:
     '''Numpy expression'''
+
 
 class Funcable:
     def to_op(self):
@@ -55,12 +54,13 @@ class BinaryNumpyEx(NumpyEx, Funcable):
     # left: NumpyEx
     # right: NumpyEx
     # func: np.ufunc
-    
+
     def __init__(self, left, right, func):
         self.left = left
         self.right = right
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
+
 
 class MMEx(NumpyEx, Funcable):
     # arg1: NumpyEx
@@ -70,6 +70,7 @@ class MMEx(NumpyEx, Funcable):
         self.arg2 = arg2
         self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
 
+
 class MVEx(NumpyEx, Funcable):
     # arg1: NumpyEx
     # arg2: NumpyEx
@@ -77,19 +78,32 @@ class MVEx(NumpyEx, Funcable):
         self.arg1 = arg1
         self.arg2 = arg2
         self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
-    
+
+
 class DotEx(NumpyEx, Funcable):
-   # left: NumpyEx
-   # right: NumpyEx
-   # func: np.dot
+
     def __init__(self, left, right):
         self.arg1 = left
         self.arg2 = right
         self.shape = calc_shape(left.shape, right.shape, np.dot)
-        self._inshape  = left.shape
+        self._inshape = left.shape
 
 
-class NPArray(NumpyEx):
+class MemoMeta(type):
+    '''Metaclass implementing caching'''
+
+    def __new__(meta, *args, **kwargs):
+        cls = super(MemoMeta, meta).__new__(meta, *args, **kwargs)
+        cls._cache = {}
+        return cls
+
+    def __call__(cls, array):
+        if id(array) not in cls._cache:
+            cls._cache[id(array)] = super(MemoMeta, cls).__call__(array)
+        return cls._cache[id(array)]
+
+
+class NPArray(NumpyEx, metaclass=MemoMeta):
     '''ndarray'''
 
     def __init__(self, array):
@@ -123,7 +137,6 @@ class Visitor:
         return visitor(node, **kwargs)
 
     def list_visit(self, lst):
-        print("list_visit")
         return [self.visit(node) for node in lst]
 
     def default_visit(self, node):
@@ -135,23 +148,6 @@ class NumpyVisitor(Visitor):
     '''Visits Numpy Expression'''
     def __init__(self):
         self.visits = 0
-    '''visitor ABC'''
-    # def visit(self, node):
-    #     '''generic visit'''
-    #     self.visits += 1
-    #     logger.debug("visiting {}. visits: {}".format(node, self.visits))
-    #     if isinstance(node, BinaryNumpyEx):
-    #         ret =  self.visit_binary(node)
-    #     elif isinstance(node, NPArray):
-    #         ret = self.visit_array(node)
-    #     elif isinstance(node, Var):
-    #         ret =  self.visit_var(node)
-    #     elif isinstance(node, Scalar):
-    #         ret =  self.visit_scalar(node)
-    #     else:
-    #         logger.critical("!!!!!Not Implemented!!!!!")
-    #         ret =  NotImplemented
-    #     return ret
 
     def visit(self, node, **kwargs):
         """Visit a node."""
@@ -168,7 +164,6 @@ class NumpyVisitor(Visitor):
         return self.visit(tree)
 
 
-
 def is_matrix_matrix(left, right):
     return len(left) > 1 and len(right) > 1
 
@@ -177,6 +172,7 @@ def is_matrix_vector(left, right):
     print(len(left))
     print(len(right))
     return len(left) > 1 and len(right) == 1
+
 
 class ShapeAnnotator(NumpyVisitor):
 
@@ -199,7 +195,9 @@ class ShapeAnnotator(NumpyVisitor):
     def visit_BinaryNumpyEx(self, node):
         left = self.visit(node.left)
         right = self.visit(node.right)
-        node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, node.func)
+        node.shape = ShapeAnnotator.calc_shape(left.shape,
+                                               right.shape,
+                                               node.func)
         return node
 
     def visit_NPArray(self, node):
@@ -218,13 +216,12 @@ class ShapeAnnotator(NumpyVisitor):
         return node
 
 
-    
 class ReduceTransformer(NumpyVisitor):
     def visit_DotEx(self, node):
         # TODO This is just for vector x vector
         left = self.visit(node.arg1)
         right = self.visit(node.arg2)
-        
+
         if is_matrix_vector(left.shape, right.shape):
             print("matrix x vector")
             return MVEx(left, right, node.shape, node._inshape)
