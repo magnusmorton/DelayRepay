@@ -68,6 +68,35 @@ if (local_id == 0) {{
 }}
 """
 
+multisim_sum = """
+__kernel
+void 
+reduce(__global uint4* input, __global uint4* output, __local uint4* sdata)
+{
+    // load shared mem
+    unsigned int tid = get_local_id(0);
+    unsigned int bid = get_group_id(0);
+    unsigned int gid = get_global_id(0);
+
+    unsigned int localSize = get_local_size(0);
+    sdata[tid] = input[gid];
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // do reduction in shared mem
+    for(unsigned int s = localSize / 2; s > 0; s >>= 1) 
+    {
+        if(tid < s) 
+        {
+            sdata[tid] += sdata[tid + s];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // write result for this block to global mem
+    if(tid == 0) output[bid] = sdata[0];
+}
+"""
+
 
 """
 //spawn N threads in only dimension 0, N is dividable by num_rows_A
@@ -82,7 +111,7 @@ __kernel void naive_matrix_vector_mul(const __global float * restrict A,
 gemv = """
 	// make sure spawn a good number of threads, so can be cut evenly
 	size_t const num_rows_per_thread = num_rows_A / get_global_size(0);
-	size_t const row_start = get_global_id(0) * num_rows_per_thread ;
+x	size_t const row_start = get_global_id(0) * num_rows_per_thread ;
 	size_t const row_end = ( get_global_id(0) + 1 ) * num_rows_per_thread ;
 
 	for(int i = row_start; i < row_end; ++i ) {{
