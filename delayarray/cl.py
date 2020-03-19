@@ -37,11 +37,15 @@ class CLKernel:
         out = "__kernel void {} ({}, __global float4 *output){{\n{}\n{}\n}}"
         inargs = []
         for name in self.inputs.keys():
+            print(name)
             if "var" in name:
                 inargs.append("__global float4* {}".format(name))
             else:
                 inargs.append("const uint {}".format(name))
         return out.format("foo", ", ".join(inargs), self.preamble, self.body)
+
+    def global_shape(self):
+        return tuple(dim // 4 for dim in self.shape)
     
 
 class Kernel2D(CLKernel):
@@ -52,8 +56,7 @@ class Kernel2D(CLKernel):
 
         super(Kernel2D, self).__init__(*args, **kwargs)
         self.preamble = PREAMBLE2D
-        self.global_shape = (self.shape[0] // 4, self.shape[1] // 4)   
-        
+                
 
 class GPUEmitter(num.NumpyVisitor):
 
@@ -71,7 +74,7 @@ class GPUEmitter(num.NumpyVisitor):
         name = "var{}".format(curr_visit)
         stmts = []
         for local in llocals + rlocals:
-            stmts.append("float {};".format(local))
+            stmts.append("float4 {};".format(local))
 
         outvar = name
         if callshape is None or callshape != node.shape:
@@ -109,7 +112,7 @@ class GPUEmitter(num.NumpyVisitor):
         name = "var{}".format(curr_visit)
         stmts = []
         for local in llocals + rlocals:
-            stmts.append("float {};".format(local))
+            stmts.append("float4 {};".format(local))
 
         outvar = name
         if callshape is None or callshape != node.shape:
@@ -168,7 +171,7 @@ node.shape)
     def visit_ReduceEx(self, node):
         curr_visit = self.visits
         arg, input_arg, stmts, mlocals = self.visit(node.arg, callshape=node._inshape)
-        decls = ["float {};".format(local) for local in mlocals]
+        decls = ["float4 {};".format(local) for local in mlocals]
         stmt = kernels.mag_sum.format(arg)
         name = "input{}".format(curr_visit)
         kernel = CLKernel(name, "\n".join(decls + stmts + [stmt]), input_arg, node.shape, reducing=True)
@@ -222,7 +225,7 @@ def run_gpu(numpy_ex):
         group_shape = (64,)
         inputs = [bufs[key] for key in kernel.inputs.keys()]
         events.append(kernel.prog.foo(queue,
-                                      kernel.global_shape,
+                                      kernel.global_shape(),
                                       None,
                                       *inputs,
                                       bufs[kernel.name]))
