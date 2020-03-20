@@ -34,7 +34,7 @@ class CLKernel:
         self.preamble = PREAMBLE
 
     def to_kern(self):
-        out = "__kernel void {} ({}, __global float *output){{\n{}\n{}\n}}"
+        out = "__kernel void {} ({}, __global float4 *output){{\n{}\n{}\n}}"
         inargs = []
         for name in self.inputs.keys():
             if "var" in name:
@@ -54,6 +54,17 @@ class CLKernel:
 class ReducingKernel(CLKernel):
     def outshape(self):
         return self.global_shape()
+
+    def to_kern(self):
+        # TODO: refactor
+        out = "__kernel void {} ({}, __global float *output){{\n{}\n{}\n}}"
+        inargs = []
+        for name in self.inputs.keys():
+            if "var" in name:
+                inargs.append("__global float4* {}".format(name))
+            else:
+                inargs.append("const uint {}".format(name))
+        return out.format("foo", ", ".join(inargs), self.preamble, self.body)
 
 
 class Kernel2D(CLKernel):
