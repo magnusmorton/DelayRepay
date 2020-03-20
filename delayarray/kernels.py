@@ -47,6 +47,9 @@ void Xasum(const int n,
 
 """
 
+dot = """
+output[i] = dot({}, {});
+"""
 
 mag_sum = """
 int local_id = get_local_id(0);

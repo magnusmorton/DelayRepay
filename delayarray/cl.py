@@ -34,10 +34,9 @@ class CLKernel:
         self.preamble = PREAMBLE
 
     def to_kern(self):
-        out = "__kernel void {} ({}, __global float4 *output){{\n{}\n{}\n}}"
+        out = "__kernel void {} ({}, __global float *output){{\n{}\n{}\n}}"
         inargs = []
         for name in self.inputs.keys():
-            print(name)
             if "var" in name:
                 inargs.append("__global float4* {}".format(name))
             else:
@@ -46,7 +45,16 @@ class CLKernel:
 
     def global_shape(self):
         return tuple(dim // 4 for dim in self.shape)
-    
+
+    def outshape(self):
+        return self.shape
+
+
+
+class ReducingKernel(CLKernel):
+    def outshape(self):
+        return self.global_shape()
+
 
 class Kernel2D(CLKernel):
     '''
@@ -178,9 +186,24 @@ node.shape)
         self.kernels.append(kernel)
         return (name+"[i]", {name: kernel})
 
+    def visit_DotEx(self, node):
+        curr_visit = self.visits
+        left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node._inshape)
+        right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node._inshape)
+        d = {**lin, **rin}
+        stmts = []
+        for local in llocals + rlocals:
+            stmts.append("float4 {};".format(local))
+        stmt = kernels.dot.format(left, right)
+        name = "input{}".format(curr_visit)
+        kernel = ReducingKernel(name, "\n".join(stmts + [stmt]), d, node._inshape, reducing=True)
+        self.kernels.append(kernel)
+        return (name+"[i]", {name:kernel})
+
+
 def run_gpu(numpy_ex):
     trans = GPUEmitter()
-    trans.walk(num.ReduceTransformer().visit(numpy_ex))
+    trans.walk(numpy_ex)
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
@@ -190,14 +213,13 @@ def run_gpu(numpy_ex):
         raise Exception("No kernels...")
     # allocating memory
     for kernel in trans.kernels:
-        print(kernel.to_kern())     
+        # print(kernel.to_kern())     
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray) and ref not in bufs:
                 first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
             elif isinstance(source, int):
-                print("FOOOOOO")
                 bufs[ref] = np.uint32(source)
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
@@ -205,19 +227,19 @@ def run_gpu(numpy_ex):
 
     last_kern = trans.kernels[-1]
         
-    resshape = last_kern.shape
+    resshape = last_kern.outshape()
     shape = first_arr.shape
     if len(shape) > 1:
         shape = (shape[0] * shape[1],)
 
     # todo fixme
-    if last_kern.reducing:
-        resshape = (resshape[0] // 64,)
-        res_np = np.empty(resshape,dtype=np.float32)
-        bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
-    else:
-        res_np = np.empty(resshape,dtype=np.float32)
-        bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
+    # if last_kern.reducing:
+    #     resshape = (resshape[0] // 64,)
+    #     res_np = np.empty(resshape,dtype=np.float32)
+    #     bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
+    # else:
+    res_np = np.empty(resshape,dtype=np.float32)
+    bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
 
     # scheduling
     events = []
