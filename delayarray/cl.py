@@ -32,14 +32,14 @@ class CLKernel:
         self.out_type = "float4"
 
     def to_kern(self):
-        out = "__kernel void {} ({}, __global {} *output){{\n{}\n{}\n}}"
         inargs = []
         for name in self.inputs.keys():
             if "var" in name:
                 inargs.append("__global float4* {}".format(name))
             else:
                 inargs.append("const uint {}".format(name))
-        return out.format("foo", ", ".join(inargs), self.out_type, self.preamble, self.body)
+
+        return f'__kernel void foo ({", ".join(inargs)}, __global {self.out_type} *output){{\n{self.preamble}\n{self.body}\n}}'
 
     def global_shape(self):
         return tuple(dim // 4 for dim in self.shape)
