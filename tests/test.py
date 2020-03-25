@@ -35,7 +35,9 @@ class TestElWise(unittest.TestCase):
         npt.assert_array_almost_equal(res, axpy(8, self.np_arr, 9))
 
     def test_regression(self):
-        fun = lambda mat: mat + mat * 3 + 9
+        def fun(mat):
+            return mat + mat * 3 + 9
+
         res = fun(self.arr)
         npt.assert_array_almost_equal(res, fun(self.np_arr))
 
