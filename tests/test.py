@@ -5,7 +5,7 @@ from delayarray.num import NPArray
 import numpy as np
 import numpy.testing as npt
 
-SIZE = 10240
+SIZE = 1024
 
 
 class TestElWise(unittest.TestCase):

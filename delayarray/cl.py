@@ -16,6 +16,7 @@ PREAMBLE2D = """
 #define TILEY_SHIFT 2
 int2 shape = (int2)(get_global_size(0), get_global_size(1));
 int2 pos = (int2)(get_global_id(0), get_global_id(1));
+int i = pos.y * shape.x + pos.x;
 """
 
 
@@ -52,6 +53,7 @@ class CLKernel:
 
     @staticmethod
     def factory(name, body, inputs, shape, reducing=False):
+        print(shape)
         if len(shape) > 1:
             return Kernel2D(name, body, inputs, shape)
         if reducing:
@@ -90,6 +92,10 @@ class Kernel2D(CLKernel):
         super(Kernel2D, self).__init__(*args, **kwargs)
         self.preamble = PREAMBLE2D
 
+    def global_shape(self):
+        return tuple(dim // 2 for dim in self.shape)
+
+
 
 class GPUEmitter(num.NumpyVisitor):
 
@@ -116,7 +122,7 @@ class GPUEmitter(num.NumpyVisitor):
             outvar = "output[i]"
         stmt = "{} = {} {} {};".format(outvar, left, op, right)
         # I've made this too complicated for myself
-        kernel = CLKernel(name, "\n".join(stmts + lstmts + rstmts + [stmt]),
+        kernel = CLKernel.factory(name, "\n".join(stmts + lstmts + rstmts + [stmt]),
                           {**lin, **rin}, node.shape)
         if callshape is None or callshape != node.shape:
             self.kernels.append(kernel)
@@ -247,6 +253,7 @@ def run_gpu(numpy_ex):
     bufs = {}
 
     if trans.kernels == []:
+
         raise Exception("No kernels...")
     # allocating memory
     for kernel in trans.kernels:
