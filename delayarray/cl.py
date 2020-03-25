@@ -239,7 +239,6 @@ def run_gpu(numpy_ex):
         raise Exception("No kernels...")
     # allocating memory
     for kernel in trans.kernels:
-        # print(kernel.to_kern())
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray) and ref not in bufs:
                 first_arr = source
@@ -255,16 +254,7 @@ def run_gpu(numpy_ex):
 
     resshape = last_kern.outshape()
     print(resshape)
-    shape = first_arr.shape
-    if len(shape) > 1:
-        shape = (shape[0] * shape[1],)
 
-    # todo fixme
-    # if last_kern.reducing:
-    #     resshape = (resshape[0] // 64,)
-    #     res_np = np.empty(resshape,dtype=np.float32)
-    #     bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes // 64)
-    # else:
     res_np = np.empty(resshape, dtype=np.float32)
     bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
 
