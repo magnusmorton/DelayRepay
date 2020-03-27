@@ -72,7 +72,6 @@ class ReducingKernel(CLKernel):
         return tuple(dim // REDUCTION_FACTOR for dim in self.shape)
 
 
-
 class Kernel2D(CLKernel):
     '''
     for 2D kernels
@@ -83,8 +82,8 @@ class Kernel2D(CLKernel):
         self.preamble = PREAMBLE2D
 
     def local_shape(self):
-        return (self.shape[0], 1,1)
-    
+        return (self.shape[0], 1, 1)
+
     def global_shape(self):
         return (self.shape[0] * self.shape[0], 1, 1)
 
