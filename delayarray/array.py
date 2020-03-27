@@ -137,7 +137,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return self
 
     def dot(self, other, out=None):
-        return self._dot(self, other)
+        return np.dot(self, other)
 
 
 def arg_to_numpy_ex(arg: Any) -> num.NumpyEx:
