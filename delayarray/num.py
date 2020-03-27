@@ -140,7 +140,6 @@ class Visitor:
         return [self.visit(node) for node in lst]
 
     def default_visit(self, node):
-        print("default_visit")
         return node
 
 
@@ -169,8 +168,6 @@ def is_matrix_matrix(left, right):
 
 
 def is_matrix_vector(left, right):
-    print(len(left))
-    print(len(right))
     return len(left) > 1 and len(right) == 1
 
 
@@ -223,10 +220,8 @@ class ReduceTransformer(NumpyVisitor):
         right = self.visit(node.arg2)
 
         if is_matrix_vector(left.shape, right.shape):
-            print("matrix x vector")
             return MVEx(left, right, node.shape, node._inshape)
         else:
-            print("vector x vector")
             muls = BinaryNumpyEx(left, right, np.multiply)
             muls.shape = node._inshape
             red = ReduceEx(np.add, muls)

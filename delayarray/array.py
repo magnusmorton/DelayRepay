@@ -121,7 +121,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             return self._dot_mv(args, kwargs)
         res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs),
                                   ex=num.DotEx(args[0], args[1])))
-        print(res)
         return np.sum(res)
 
     def __array_function__(self, func, types, args, kwargs):
