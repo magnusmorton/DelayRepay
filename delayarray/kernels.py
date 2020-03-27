@@ -153,9 +153,9 @@ gemm = """
 
 	float res = 0;
 	for( int j = 0; j< num_cols_A ; ++j )
-		res +=  {}[ work_group_id * num_cols_A + j ] * {}[ local_thread_id + j * num_rows_A ];
+		res +=  {matrixA}[ work_group_id * num_cols_A + j ] * {matrixB}[ local_thread_id + j * num_rows_A ];
 
-        {}[work_group_id * num_cols_A + local_thread_id] = res;
+        {matrixC}[work_group_id * num_cols_A + local_thread_id] = res;
 """
 
 gemm_new = """

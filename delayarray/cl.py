@@ -7,10 +7,6 @@ import numpy as np
 logger = logging.getLogger("delayRepay.cl")
 PREAMBLE = "int i = get_global_id(0);"
 PREAMBLE2D = """
-#define TILEX 4
-#define TILEX_SHIFT 2
-#define TILEY 4
-#define TILEY_SHIFT 2
 int2 shape = (int2)(get_global_size(0), get_global_size(1));
 int2 pos = (int2)(get_global_id(0), get_global_id(1));
 int i = pos.y * shape.x + pos.x;
@@ -85,6 +81,12 @@ class Kernel2D(CLKernel):
 
         super(Kernel2D, self).__init__(*args, **kwargs)
         self.preamble = PREAMBLE2D
+
+    def local_shape(self):
+        return (self.shape[0], 1,1)
+    
+    def global_shape(self):
+        return (self.shape[0] * self.shape[0], 1, 1)
 
 
 class GPUEmitter(num.NumpyVisitor):
@@ -190,12 +192,11 @@ class GPUEmitter(num.NumpyVisitor):
         outvar = name
         if callshape is None or callshape != node.shape:
             outvar = "output"
-        stmt = kernels.gemm_new.format(matrixA=left, matrixB=right,
-                                       matrixC=outvar)
+        stmt = kernels.gemm.format(matrixA=left, matrixB=right, matrixC=outvar)
 
         d = {**lin, **rin}
         d["num_cols_A"] = node.arg1.array.shape[1]
-        d["num_cols_B"] = node.arg2.array.shape[1]
+        d["num_rows_A"] = node.arg1.array.shape[0]
         kernel = CLKernel.factory(name, "\n".join(stmts + lstmts + rstmts + [stmt]),
                                   d,
                                   node.shape)
@@ -275,6 +276,9 @@ def run_gpu(numpy_ex):
     events = []
     for kernel in trans.kernels:
         inputs = [bufs[key] for key in kernel.inputs.keys()]
+        print(kernel.to_kern())
+        print(kernel.global_shape())
+        print(kernel.local_shape())
         events.append(kernel.prog.foo(queue,
                                       kernel.global_shape(),
                                       kernel.local_shape(),
