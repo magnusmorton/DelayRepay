@@ -16,6 +16,8 @@ int2 pos = (int2)(get_global_id(0), get_global_id(1));
 int i = pos.y * shape.x + pos.x;
 """
 
+REDUCTION_FACTOR = 32
+
 
 class CLKernel:
 
@@ -26,27 +28,32 @@ class CLKernel:
         self.shape = shape
         self.reducing = False
         self.preamble = PREAMBLE
-        self.out_type = "float4"
+        self.out_type = "float"
 
     def to_kern(self):
         inargs = []
         for name in self.inputs.keys():
+            # TODO something else
             if "var" in name:
-                inargs.append("__global float4* {}".format(name))
+                inargs.append("__global float* {}".format(name))
+            elif "local" in name:
+                inargs.append(f"__local float* {name}")
             else:
                 inargs.append("const uint {}".format(name))
 
         return f'__kernel void foo ({", ".join(inargs)}, __global {self.out_type} *output){{\n{self.preamble}\n{self.body}\n}}'
 
     def global_shape(self):
-        return tuple(dim // 4 for dim in self.shape)
+        return self.shape
+
+    def local_shape(self):
+        return None
 
     def outshape(self):
         return self.shape
 
     @staticmethod
     def factory(name, body, inputs, shape, reducing=False):
-        print(shape)
         if len(shape) > 1:
             return Kernel2D(name, body, inputs, shape)
         if reducing:
@@ -62,8 +69,12 @@ class ReducingKernel(CLKernel):
         self.reducing = True
         self.out_type = "float"
 
+    def local_shape(self):
+        return (REDUCTION_FACTOR,)
+
     def outshape(self):
-        return self.global_shape()
+        return tuple(dim // REDUCTION_FACTOR for dim in self.shape)
+
 
 
 class Kernel2D(CLKernel):
@@ -74,9 +85,6 @@ class Kernel2D(CLKernel):
 
         super(Kernel2D, self).__init__(*args, **kwargs)
         self.preamble = PREAMBLE2D
-
-    def global_shape(self):
-        return tuple(dim // 2 for dim in self.shape)
 
 
 class GPUEmitter(num.NumpyVisitor):
@@ -97,7 +105,7 @@ class GPUEmitter(num.NumpyVisitor):
         name = "var{}".format(curr_visit)
         stmts = []
         for local in llocals + rlocals:
-            stmts.append("float4 {};".format(local))
+            stmts.append("float {};".format(local))
 
         outvar = name
         if callshape is None or callshape != node.shape:
@@ -140,7 +148,7 @@ class GPUEmitter(num.NumpyVisitor):
         name = "var{}".format(curr_visit)
         stmts = []
         for local in llocals + rlocals:
-            stmts.append("float4 {};".format(local))
+            stmts.append("float {};".format(local))
 
         outvar = name
         if callshape is None or callshape != node.shape:
@@ -200,13 +208,17 @@ class GPUEmitter(num.NumpyVisitor):
 
     def visit_ReduceEx(self, node):
         curr_visit = self.visits
-        arg, input_arg, stmts, mlocals = self.visit(node.arg,
+        arg, input_args, stmts, mlocals = self.visit(node.arg,
                                                     callshape=node._inshape)
-        decls = ["float4 {};".format(local) for local in mlocals]
-        stmt = kernels.mag_sum.format(arg)
+        decls = ["float {};".format(local) for local in mlocals]
+        stmt = kernels.dot.format(arg)
         name = "input{}".format(curr_visit)
-        kernel = CLKernel.factory(name, "\n".join(decls + stmts + [stmt]), input_arg,
-                          node.shape, reducing=True)
+        input_args["localSums"] = cl.LocalMemory(
+            node.shape[0] // REDUCTION_FACTOR
+        )
+        
+        kernel = CLKernel.factory(name, "\n".join(decls + stmts + [stmt]), input_args,
+                                  node.shape, reducing=True)
         self.kernels.append(kernel)
         return (name+"[i]", {name: kernel})
 
@@ -217,7 +229,7 @@ class GPUEmitter(num.NumpyVisitor):
         d = {**lin, **rin}
         stmts = []
         for local in llocals + rlocals:
-            stmts.append("float4 {};".format(local))
+            stmts.append("float {};".format(local))
         stmt = kernels.dot.format(left, right)
         name = "input{}".format(curr_visit)
         kernel = CLKernel.factory(name, "\n".join(stmts + [stmt]), d,
@@ -228,7 +240,7 @@ class GPUEmitter(num.NumpyVisitor):
 
 def run_gpu(numpy_ex):
     trans = GPUEmitter()
-    trans.walk(numpy_ex)
+    trans.walk(num.ReduceTransformer().walk(numpy_ex))
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mf = cl.mem_flags
@@ -246,6 +258,8 @@ def run_gpu(numpy_ex):
                                       hostbuf=source)
             elif isinstance(source, int):
                 bufs[ref] = np.uint32(source)
+            elif isinstance(source, cl.LocalMemory):
+                bufs[ref] = source
             else:
                 bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
@@ -253,7 +267,6 @@ def run_gpu(numpy_ex):
     last_kern = trans.kernels[-1]
 
     resshape = last_kern.outshape()
-    print(resshape)
 
     res_np = np.empty(resshape, dtype=np.float32)
     bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
@@ -261,12 +274,10 @@ def run_gpu(numpy_ex):
     # scheduling
     events = []
     for kernel in trans.kernels:
-        print(kernel.global_shape())
-        print(kernel.to_kern())
         inputs = [bufs[key] for key in kernel.inputs.keys()]
         events.append(kernel.prog.foo(queue,
                                       kernel.global_shape(),
-                                      None,
+                                      kernel.local_shape(),
                                       *inputs,
                                       bufs[kernel.name]))
 

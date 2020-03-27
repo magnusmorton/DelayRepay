@@ -47,7 +47,26 @@ void Xasum(const int n,
 
 """
 
-dot = """
+
+dot =  """
+int local_id = get_local_id(0);
+int group_size = get_local_size(0);
+
+localSums[local_id] = {};
+barrier(CLK_LOCAL_MEM_FENCE);
+for (int offset = 1; offset < group_size; offset <<= 1) {{
+    int mask = (offset << 1) - 1;
+    if ((local_id & mask) == 0) {{
+        localSums[local_id] += localSums[offset];
+    }}
+    barrier(CLK_LOCAL_MEM_FENCE);
+}}
+if (local_id == 0) {{
+    output[get_group_id(0)] = localSums[0];
+
+}}
+"""
+vdot = """
 output[i] = dot({}, {});
 """
 
@@ -114,7 +133,7 @@ __kernel void naive_matrix_vector_mul(const __global float * restrict A,
 gemv = """
 	// make sure spawn a good number of threads, so can be cut evenly
 	size_t const num_rows_per_thread = num_rows_A / get_global_size(0);
-x	size_t const row_start = get_global_id(0) * num_rows_per_thread ;
+	size_t const row_start = get_global_id(0) * num_rows_per_thread ;
 	size_t const row_end = ( get_global_id(0) + 1 ) * num_rows_per_thread ;
 
 	for(int i = row_start; i < row_end; ++i ) {{
@@ -122,6 +141,10 @@ x	size_t const row_start = get_global_id(0) * num_rows_per_thread ;
 		for( int j = 0; j < num_cols_A; ++j )
 			 {}[i] += {}[ i * num_cols_A + j ] * {}[j]; // C A B
 	}}	
+"""
+
+gemvv = """
+
 """
 
 gemm = """
