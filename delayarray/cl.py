@@ -25,6 +25,7 @@ class CLKernel:
         self.reducing = False
         self.preamble = PREAMBLE
         self.out_type = "float"
+        self.dtype = np.float32
 
     def to_kern(self):
         inargs = []
@@ -47,6 +48,9 @@ class CLKernel:
 
     def outshape(self):
         return self.shape
+
+    def outbytes(self):
+        return np.prod(self.outshape()) * self.dtype().itemsize
 
     @staticmethod
     def factory(name, body, inputs, shape, reducing=False):
@@ -247,42 +251,32 @@ def run_gpu(numpy_ex):
     bufs = {}
 
     if trans.kernels == []:
-
         raise Exception("No kernels...")
-    # allocating memory
-    for kernel in trans.kernels:
+
+    events = []
+    for i, kernel in enumerate(trans.kernels):
+        inputs = []
         for ref, source in kernel.inputs.items():
             if isinstance(source, np.ndarray) and ref not in bufs:
-                first_arr = source
                 bufs[ref] = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR,
                                       hostbuf=source)
             elif isinstance(source, int):
                 bufs[ref] = np.uint32(source)
             elif isinstance(source, cl.LocalMemory):
                 bufs[ref] = source
-            else:
-                bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+            # else:
+            #     bufs[ref] = cl.Buffer(ctx, mf.READ_WRITE, first_arr.nbytes)
+            inputs.append(bufs[ref])
+
+        bufs[kernel.name] = cl.Buffer(ctx, mf.READ_WRITE, kernel.outbytes())
+        last_kern = kernel
         kernel.prog = cl.Program(ctx, kernel.to_kern()).build()
-
-    last_kern = trans.kernels[-1]
-
-    resshape = last_kern.outshape()
-
-    res_np = np.empty(resshape, dtype=np.float32)
-    bufs[last_kern.name] = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
-
-    # scheduling
-    events = []
-    for kernel in trans.kernels:
-        inputs = [bufs[key] for key in kernel.inputs.keys()]
-        print(kernel.to_kern())
-        print(kernel.global_shape())
-        print(kernel.local_shape())
         events.append(kernel.prog.foo(queue,
                                       kernel.global_shape(),
                                       kernel.local_shape(),
                                       *inputs,
                                       bufs[kernel.name]))
 
+    res_np = np.empty(last_kern.outshape(), dtype=last_kern.dtype)
     cl.enqueue_copy(queue, res_np, bufs[last_kern.name], wait_for=events)
     return res_np
