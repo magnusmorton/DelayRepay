@@ -91,6 +91,20 @@ class Kernel2D(CLKernel):
     def global_shape(self):
         return (self.shape[0] * self.shape[0], 1, 1)
 
+class VisitResult:
+
+    def __init__(self, name, input_args, statements, local_defs):
+        "docstring"
+        self.name = name
+        self.input_args = input_args
+        self.statements = statements
+        self.local_defs = local_defs
+
+    def __add__(self, other):
+        new = VisitResult(self.name, {**self.local_defs, **other.local_defs}, self.local_defs + other.local_defs)
+        
+        
+
 
 class GPUEmitter(num.NumpyVisitor):
 
@@ -126,6 +140,15 @@ class GPUEmitter(num.NumpyVisitor):
         else:
             return (name, {**lin, **rin}, lstmts + rstmts + [stmt],
                     [name] + llocals + rlocals)
+
+
+    def visit_UnaryFuncEx(self, node, callshape=None):
+        stmt = '{} = {}({});'
+        curr_visit = self.visits
+        return None
+
+    
+        
 
     def visit_NPArray(self, node, callshape=None):
         name = "var{}".format(id(node))

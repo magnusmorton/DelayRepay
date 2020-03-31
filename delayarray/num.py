@@ -49,6 +49,21 @@ class ReduceEx(NumpyEx, Funcable):
     # arg: NumpyEx
 
 
+class UnaryFuncEx(NumpyEx, Funcable):
+
+    def __init__(self, arg, func):
+        self.arg = arg
+        self.func = func
+        self.shape = arg.shape
+
+
+def create_ex(*args):
+    if len(args) == 2:
+        return UnaryFuncEx(*args)
+    else:
+        return BinaryNumpyEx(*args)
+
+
 class BinaryNumpyEx(NumpyEx, Funcable):
     '''Binary numpy expression'''
     # left: NumpyEx

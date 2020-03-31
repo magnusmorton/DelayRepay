@@ -100,7 +100,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         # cls = func_to_numpy_ex(ufunc)
         args = [arg_to_numpy_ex(arg) for arg in inputs]
         return DelayArray(self.shape, ops=(ufunc, inputs, kwargs),
-                          ex=num.BinaryNumpyEx(args[0], args[1], ufunc))
+                          ex=num.create_ex(*args, ufunc))
 
     def _dot_mv(self, args, kwargs):
         return DelayArray((args[0].array.shape[0], ),
@@ -127,7 +127,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         if func.__name__ == "dot":
             return self._dot(args, kwargs)
         return HANDLED_FUNCTIONS[func](*args, **kwargs)
-        
+
     def astype(self, *args, **kwargs):
         self._ndarray = self._ndarray.astype(*args, **kwargs)
         if isinstance(self.ex, num.NPArray):
