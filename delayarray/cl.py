@@ -101,7 +101,11 @@ class VisitResult:
         self.local_defs = local_defs
 
     def __add__(self, other):
-        new = VisitResult(self.name, {**self.local_defs, **other.local_defs}, self.local_defs + other.local_defs)
+        new = VisitResult(self.name,
+                          {**self.local_defs, **other.local_defs},
+                          self.statements + other.statements,
+                          self.local_defs + other.local_defs)
+        return new
         
         
 
@@ -143,9 +147,29 @@ class GPUEmitter(num.NumpyVisitor):
 
 
     def visit_UnaryFuncEx(self, node, callshape=None):
-        stmt = '{} = {}({});'
+
         curr_visit = self.visits
-        return None
+        arg, input_args, stmts, mlocals = self.visit(node.arg,
+                                                     callshape=node.shape)
+        decls = ["float {};".format(local) for local in mlocals]
+        name = f"var{id(node)}"
+        outvar = name
+        if callshape is None or callshape != node.shape:
+            outvar = "output[i]"
+
+        stmt = f"{outvar} = {node.func.__name__}({arg});"
+        name = "input{}".format(curr_visit)
+        kernel = CLKernel.factory(name, "\n".join(decls + stmts + [stmt]), input_args,
+                                  node.shape)
+
+        if callshape is None or callshape != node.shape:
+            self.kernels.append(kernel)
+            return (name+"[i]", {name: kernel}, [], [])
+        else:
+            return (name, input_args, decls + [stmt],
+                    [name] + mlocals)
+        self.kernels.append(kernel)
+        return (name+"[i]", {name: kernel})
 
     
         
