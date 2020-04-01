@@ -13,6 +13,9 @@ OPS = {
     'true_divide': '/'
 }
 
+FUNCS = {
+    'power': 'pow'
+}
 
 def calc_shape(left, right, op=None):
     if left == (0,):
@@ -29,6 +32,8 @@ def calc_shape(left, right, op=None):
             return (left[0],)
         else:
             return (0,)
+    else:
+        return left
 
 
 class NumpyEx:
@@ -51,17 +56,30 @@ class ReduceEx(NumpyEx, Funcable):
 
 class UnaryFuncEx(NumpyEx, Funcable):
 
-    def __init__(self, arg, func):
+    def __init__(self, func, arg):
         self.arg = arg
         self.func = func
         self.shape = arg.shape
 
 
-def create_ex(*args):
-    if len(args) == 2:
-        return UnaryFuncEx(*args)
-    else:
-        return BinaryNumpyEx(*args)
+class BinaryFuncEx(NumpyEx):
+
+    def __init__(self, func, left, right):
+        self.left = left
+        self.right = right
+        self.func = func
+        self.shape = calc_shape(left.shape, right.shape, func)
+
+    def to_op(self):
+        return FUNCS[self.func.__name__]
+
+
+def create_ex(func, args):
+    if func.__name__ in OPS:
+        return BinaryNumpyEx(func, *args)
+    if len(args) == 1:
+        return UnaryFuncEx(func, *args)
+    return BinaryFuncEx(func, *args)
 
 
 class BinaryNumpyEx(NumpyEx, Funcable):
@@ -70,7 +88,7 @@ class BinaryNumpyEx(NumpyEx, Funcable):
     # right: NumpyEx
     # func: np.ufunc
 
-    def __init__(self, left, right, func):
+    def __init__(self, func, left, right):
         self.left = left
         self.right = right
         self.func = func

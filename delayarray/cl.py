@@ -145,12 +145,9 @@ class GPUEmitter(num.NumpyVisitor):
             return (name, {**lin, **rin}, lstmts + rstmts + [stmt],
                     [name] + llocals + rlocals)
 
-
     def visit_UnaryFuncEx(self, node, callshape=None):
-
         curr_visit = self.visits
-        arg, input_args, stmts, mlocals = self.visit(node.arg,
-                                                     callshape=node.shape)
+        arg, input_args, stmts, mlocals = self.visit(node.arg, callshape=node.shape)
         decls = ["float {};".format(local) for local in mlocals]
         name = f"var{id(node)}"
         outvar = name
@@ -171,7 +168,32 @@ class GPUEmitter(num.NumpyVisitor):
         self.kernels.append(kernel)
         return (name+"[i]", {name: kernel})
 
-    
+    def visit_BinaryFuncEx(self, node, callshape=None):
+        curr_visit = self.visits
+        left, lin, lstmts, llocals = self.visit(node.left,
+                                                callshape=node.shape)
+        right, rin, rstmts, rlocals = self.visit(node.right,
+                                                 callshape=node.shape)
+        name = "var{}".format(curr_visit)
+        stmts = []
+        for local in llocals + rlocals:
+            stmts.append("float {};".format(local))
+
+        outvar = name
+        if callshape is None or callshape != node.shape:
+            outvar = "output[i]"
+        stmt = f"{outvar} = {node.to_op()}({left}, {right});"
+        # I've made this too complicated for myself
+        kernel = CLKernel.factory(name, "\n".join(stmts + lstmts + rstmts +
+                                                  [stmt]), {**lin, **rin},
+                                  node.shape)
+        if callshape is None or callshape != node.shape:
+            self.kernels.append(kernel)
+            return (name+"[i]", {name: kernel}, [], [])
+        else:
+            return (name, {**lin, **rin}, lstmts + rstmts + [stmt],
+                    [name] + llocals + rlocals)
+
         
 
     def visit_NPArray(self, node, callshape=None):

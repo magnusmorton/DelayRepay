@@ -100,7 +100,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         # cls = func_to_numpy_ex(ufunc)
         args = [arg_to_numpy_ex(arg) for arg in inputs]
         return DelayArray(self.shape, ops=(ufunc, inputs, kwargs),
-                          ex=num.create_ex(*args, ufunc))
+                          ex=num.create_ex(ufunc, args))
 
     def _dot_mv(self, args, kwargs):
         return DelayArray((args[0].array.shape[0], ),
@@ -177,6 +177,15 @@ def diagflat(arr, k=0):
     # keep it simple for now
     return np.diagflat(np.asarray(arr, order='C'))
 
+
+add = cast(np.add)
+dot = cast(np.dot)
+cos = cast(np.cos)
+sin = cast(np.sin)
+tan = cast(np.tan)
+subtract = cast(np.subtract)
+exp = cast(np.exp)
+power = cast(np.power)
 
 # Ones and zeros
 empty = cast(np.empty)
