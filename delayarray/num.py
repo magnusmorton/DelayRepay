@@ -255,7 +255,7 @@ class ReduceTransformer(NumpyVisitor):
         if is_matrix_vector(left.shape, right.shape):
             return MVEx(left, right, node.shape, node._inshape)
         else:
-            muls = BinaryNumpyEx(left, right, np.multiply)
+            muls = BinaryNumpyEx(np.multiply, left, right)
             muls.shape = node._inshape
             red = ReduceEx(np.add, muls)
             red.shape = node._inshape
