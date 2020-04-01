@@ -1,8 +1,9 @@
 import pyopencl as cl
 import numpy as np
 
+SIZE = (160000000,)
 
-a_np = np.ones(102400).astype(np.float32)
+a_np = np.ones(SIZE).astype(np.float32)
 ctx = cl.create_some_context()
 queue = cl.CommandQueue(ctx)
 
@@ -40,18 +41,45 @@ __kernel void parsum(__global float* input, __global float* partial_sums, __loca
     }
 
 }
+
+__kernel void thac(__global float* input, __global float* res)
+{
+        int idx = get_global_id(0);
+        
+        float var1 = input[idx] * 4.0f;
+        float var2 = var1 + 76.0f;
+        res[idx] = var2;
+}
+
+__kernel void expr(__global float* input, __global float* res)
+{
+        int idx = get_global_id(0);
+        
+       
+
+        res[idx] = input[idx] * 4.0f + 76.0f;
+}
+
+__kernel void madex(__global float4* input, __global float4* res)
+{
+        int idx = get_global_id(0);
+        
+       
+
+        res[idx] = mad(input[idx], 4.0, 76.0);
+}
 """).build()
 
-local_g = cl.LocalMemory(2048)
-res_np = np.empty((1600,)).astype(np.float32)
+
+res_np = np.empty(SIZE).astype(np.float32)
 res_g = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
 res_g2 = cl.Buffer(ctx, mf.READ_WRITE, res_np.nbytes)
-print(a_np.shape)
-prg.parsum(queue,a_np.shape ,(64,), a_g, res_g, local_g)
 
-prg.parsum(queue, res_np.shape, (1600,), res_g, res_g2, local_g)
+inshape = (SIZE[0] // 4, )
+print(a_np.shape)
+prg.madex(queue, inshape, None, res_g, res_g2)
+
 cl.enqueue_copy(queue, res_np, res_g2)
 
 print(res_np)
 
-print(np.sum(res_np))
