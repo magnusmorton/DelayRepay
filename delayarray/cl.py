@@ -120,12 +120,11 @@ class GPUEmitter(num.NumpyVisitor):
 
     def visit_BinaryNumpyEx(self, node, callshape=None):
         op = node.to_op()
-        curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.left,
                                                 callshape=node.shape)
         right, rin, rstmts, rlocals = self.visit(node.right,
                                                  callshape=node.shape)
-        name = "var{}".format(curr_visit)
+        name = "var{}".format(id(node))
         stmts = []
         for local in llocals + rlocals:
             stmts.append("float {};".format(local))
@@ -146,7 +145,6 @@ class GPUEmitter(num.NumpyVisitor):
                     [name] + llocals + rlocals)
 
     def visit_UnaryFuncEx(self, node, callshape=None):
-        curr_visit = self.visits
         arg, input_args, stmts, mlocals = self.visit(node.arg, callshape=node.shape)
         decls = ["float {};".format(local) for local in mlocals]
         name = f"var{id(node)}"
@@ -155,7 +153,6 @@ class GPUEmitter(num.NumpyVisitor):
             outvar = "output[i]"
 
         stmt = f"{outvar} = {node.func.__name__}({arg});"
-        name = "input{}".format(curr_visit)
         kernel = CLKernel.factory(name, "\n".join(decls + stmts + [stmt]), input_args,
                                   node.shape)
 
@@ -169,12 +166,11 @@ class GPUEmitter(num.NumpyVisitor):
         return (name+"[i]", {name: kernel})
 
     def visit_BinaryFuncEx(self, node, callshape=None):
-        curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.left,
                                                 callshape=node.shape)
         right, rin, rstmts, rlocals = self.visit(node.right,
                                                  callshape=node.shape)
-        name = "var{}".format(curr_visit)
+        name = f"var{id(node)}"
         stmts = []
         for local in llocals + rlocals:
             stmts.append("float {};".format(local))
@@ -205,7 +201,6 @@ class GPUEmitter(num.NumpyVisitor):
         return (node.val, {}, [], [])
 
     def visit_MVEx(self, node, callshape=None):
-        curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1,
                                                 callshape=node.arg1.array.shape)
         right, rin, rstmts, rlocals = self.visit(node.arg2,
@@ -219,7 +214,7 @@ class GPUEmitter(num.NumpyVisitor):
             if right.endswith('[i]'):
                 right = right[:-3]
 
-        name = "var{}".format(curr_visit)
+        name = f"var{id(node)}"
         stmts = []
         for local in llocals + rlocals:
             stmts.append("float {};".format(local))
@@ -244,7 +239,6 @@ class GPUEmitter(num.NumpyVisitor):
             return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
 
     def visit_MMEx(self, node, callshape=None):
-        curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node.arg1.array.shape)
         right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node.arg2.array.shape)
 
@@ -256,7 +250,7 @@ class GPUEmitter(num.NumpyVisitor):
             if right.endswith('[i]'):
                 right = right[:-3]
 
-        name = "var{}".format(curr_visit)
+        name = f"var{id(node)}"
         stmts = []
         for local in llocals + rlocals:
             stmts.append("float {};".format(local))
@@ -280,12 +274,11 @@ class GPUEmitter(num.NumpyVisitor):
             return (name, {**lin, **rin}, [stmt], [name] + llocals + rlocals)
 
     def visit_ReduceEx(self, node):
-        curr_visit = self.visits
         arg, input_args, stmts, mlocals = self.visit(node.arg,
                                                     callshape=node._inshape)
         decls = ["float {};".format(local) for local in mlocals]
         stmt = kernels.dot.format(arg)
-        name = "input{}".format(curr_visit)
+        name = f"input{id(node)}"
         input_args["localSums"] = cl.LocalMemory(
             node.shape[0] // REDUCTION_FACTOR
         )
@@ -296,7 +289,6 @@ class GPUEmitter(num.NumpyVisitor):
         return (name+"[i]", {name: kernel})
 
     def visit_DotEx(self, node):
-        curr_visit = self.visits
         left, lin, lstmts, llocals = self.visit(node.arg1, callshape=node._inshape)
         right, rin, rstmts, rlocals = self.visit(node.arg2, callshape=node._inshape)
         d = {**lin, **rin}
@@ -304,7 +296,7 @@ class GPUEmitter(num.NumpyVisitor):
         for local in llocals + rlocals:
             stmts.append("float {};".format(local))
         stmt = kernels.dot.format(left, right)
-        name = "input{}".format(curr_visit)
+        name = f"input{id(node)}"
         kernel = CLKernel.factory(name, "\n".join(stmts + [stmt]), d,
                                 node._inshape, reducing=True)
         self.kernels.append(kernel)
