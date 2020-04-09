@@ -1,4 +1,4 @@
 #from numpy import *
-from .array import *
+from .cuarray import *
 import delayarray.random
 
