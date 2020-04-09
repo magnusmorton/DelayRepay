@@ -1,0 +1,514 @@
+'''Delay array and related stuff'''
+
+from typing import Any, List, Dict
+import cupy # type: ignore
+import numpy as np # type: ignore
+import numpy.lib.mixins # type: ignore
+
+
+
+OPS = {
+    'matmul': '@',
+    'add': '+',
+    'multiply': '*',
+    'subtract': '-',
+    'true_divide': '/'
+}
+
+FUNCS = {
+    'power': 'pow'
+}
+
+
+class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
+
+    def __repr__(self):
+        return str(self.__array__())
+
+    def __array__(self):
+        # return NumpyFunction(self.ex)()
+        if isinstance(self, NPArray):
+            return self.array
+        return dcupy.run_gpu(self)
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        if ufunc.__name__ == 'matmul':
+            return self._dot(inputs, kwargs)
+        # cls = func_to_numpy_ex(ufunc)
+        args = [arg_to_numpy_ex(arg) for arg in inputs]
+        return create_ex(ufunc, args)
+
+    def _dot_mv(self, args, kwargs):
+        return MVEx(args[0], args[1])
+
+    def _dot_mm(self, args, kwargs):
+        return MMEx(args[0], args[1])
+
+    def _dot(self, args, kwargs):
+        # scalar result dot
+        args = [arg_to_numpy_ex(arg) for arg in args]
+        if is_matrix_matrix(args[0].shape, args[1].shape):
+            return self._dot_mm(args, kwargs)
+        if is_matrix_vector(args[0].shape, args[1].shape):
+            return self._dot_mv(args, kwargs)
+        res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs),
+                                  ex=DotEx(args[0], args[1])))
+        return np.sum(res)
+
+    def __array_function__(self, func, types, args, kwargs):
+        if func.__name__ == "dot":
+            return self._dot(args, kwargs)
+        return HANDLED_FUNCTIONS[func](*args, **kwargs)
+
+    def astype(self, *args, **kwargs):
+        if isinstance(self, NPArray):
+            self.array = self.array.astype(*args, **kwargs)
+        else:
+            raise Exception("Dont call astype here")
+        return self
+
+    def dot(self, other, out=None):
+        return np.dot(self, other)
+
+
+def calc_shape(left, right, op=None):
+    if left == (0,):
+        return right
+    if right is (0,):
+        return left
+    if op.__name__ in OPS:
+        return left
+    if op.__name__ == 'dot':
+        # for now
+        if len(left) > 1 and len(right) > 1:
+            return (left[0], right[1])
+        elif len(left) > 1:
+            return (left[0],)
+        else:
+            return (0,)
+    else:
+        return left
+
+
+class NumpyEx(DelayArray):
+    '''Numpy expression'''
+    
+    @property
+    def name(self):
+        return f"var{id(self)}"
+
+class Funcable:
+    def to_op(self):
+        return OPS[self.func.__name__]
+
+
+class ReduceEx(NumpyEx, Funcable):
+    def __init__(self, func, arg):
+        self.func = func
+        self.arg = arg
+
+    # func: np.ufunc
+    # arg: NumpyEx
+
+
+class UnaryFuncEx(NumpyEx, Funcable):
+
+    def __init__(self, func, arg):
+        self.arg = arg
+        self.func = func
+        self.shape = arg.shape
+
+
+class BinaryFuncEx(NumpyEx):
+
+    def __init__(self, func, left, right):
+        self.left = left
+        self.right = right
+        self.func = func
+        self.shape = calc_shape(left.shape, right.shape, func)
+
+    def to_op(self):
+        return FUNCS[self.func.__name__]
+
+
+def create_ex(func, args):
+    if func.__name__ in OPS:
+        return BinaryNumpyEx(func, *args)
+    if len(args) == 1:
+        return UnaryFuncEx(func, *args)
+    return BinaryFuncEx(func, *args)
+
+
+class BinaryNumpyEx(NumpyEx, Funcable):
+    '''Binary numpy expression'''
+    # left: NumpyEx
+    # right: NumpyEx
+    # func: np.ufunc
+
+    def __init__(self, func, left, right):
+        self.left = left
+        self.right = right
+        self.func = func
+        self.shape = calc_shape(left.shape, right.shape, func)
+
+
+class MMEx(NumpyEx, Funcable):
+    # arg1: NumpyEx
+    # arg2: NumpyEx
+    def __init__(self, arg1, arg2):
+        self.arg1 = arg1
+        self.arg2 = arg2
+        self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
+
+
+class MVEx(NumpyEx, Funcable):
+    # arg1: NumpyEx
+    # arg2: NumpyEx
+    def __init__(self, arg1, arg2):
+        self.arg1 = arg1
+        self.arg2 = arg2
+        self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
+
+
+class DotEx(NumpyEx, Funcable):
+
+    def __init__(self, left, right):
+        self.arg1 = left
+        self.arg2 = right
+        self.shape = calc_shape(left.shape, right.shape, np.dot)
+        self._inshape = left.shape
+
+
+class MemoMeta(type):
+    '''Metaclass implementing caching'''
+
+    def __new__(meta, *args, **kwargs):
+        cls = super(MemoMeta, meta).__new__(meta, *args, **kwargs)
+        cls._cache = {}
+        return cls
+
+    def __call__(cls, array):
+        if id(array) not in cls._cache:
+            cls._cache[id(array)] = super(MemoMeta, cls).__call__(array)
+        return cls._cache[id(array)]
+
+
+class NPArray(NumpyEx, DelayArray, metaclass=MemoMeta):
+    '''ndarray'''
+
+    def __init__(self, array):
+        self.array = array
+        self.shape = array.shape
+
+    def __hash__(self):
+        return id(self.array)
+
+    def __eq__(self, other):
+        return self.array is other.array
+
+
+class Scalar(NumpyEx):
+    '''a scalar'''
+    # val: Number
+    def __init__(self, val):
+        self.val = val
+        self.shape = (0,)
+
+
+class Visitor:
+    '''Visitor ABC'''
+    def visit(self, node, **kwargs):
+        """Visit a node."""
+        if isinstance(node, list):
+            visitor = self.list_visit
+        else:
+            method = 'visit_' + node.__class__.__name__
+            visitor = getattr(self, method, self.default_visit)
+        return visitor(node, **kwargs)
+
+    def list_visit(self, lst):
+        return [self.visit(node) for node in lst]
+
+    def default_visit(self, node):
+        return node
+
+
+class NumpyVisitor(Visitor):
+    '''Visits Numpy Expression'''
+    def __init__(self):
+        self.visits = 0
+
+    def visit(self, node, **kwargs):
+        """Visit a node."""
+        self.visits += 1
+        return super(NumpyVisitor, self).visit(node, **kwargs)
+
+    def visit_BinaryExpression(self, node):
+        return node
+
+    def walk(self, tree):
+        ''' top-level walk of tree'''
+        self.visits = 0
+        return self.visit(tree)
+
+
+def is_matrix_matrix(left, right):
+    return len(left) > 1 and len(right) > 1
+
+
+def is_matrix_vector(left, right):
+    return len(left) > 1 and len(right) == 1
+
+
+class ShapeAnnotator(NumpyVisitor):
+
+    def calc_shape(left, right, op=None):
+        if left == (0,):
+            return right
+        if right is (0,):
+            return left
+        if op.__name__ in OPS:
+            return left
+        if op.__name__ == 'dot':
+            # for now
+            if len(left) > 1 and len(right) > 1:
+                return (left[0], right[1])
+            elif len(left) > 1:
+                return (left[0],)
+            else:
+                return (0,)
+
+    def visit_BinaryNumpyEx(self, node):
+        left = self.visit(node.left)
+        right = self.visit(node.right)
+        node.shape = ShapeAnnotator.calc_shape(left.shape,
+                                               right.shape,
+                                               node.func)
+        return node
+
+    def visit_NPArray(self, node):
+        node.shape = node.array.shape
+        return node
+
+    def visit_Scalar(self, node):
+        node.shape = (0,)
+        return node
+
+    def visit_DotEx(self, node):
+        left = self.visit(node.arg1)
+        right = self.visit(node.arg2)
+        node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, np.dot)
+        node._inshape = left.shape
+        return node
+
+
+class ReduceTransformer(NumpyVisitor):
+    def visit_DotEx(self, node):
+        # TODO This is just for vector x vector
+        left = self.visit(node.arg1)
+        right = self.visit(node.arg2)
+
+        if is_matrix_vector(left.shape, right.shape):
+            return MVEx(left, right, node.shape, node._inshape)
+        else:
+            muls = BinaryNumpyEx(np.multiply, left, right)
+            muls.shape = node._inshape
+            red = ReduceEx(np.add, muls)
+            red.shape = node._inshape
+            red._inshape = node._inshape
+            return red
+
+
+def cast(func):
+    '''cast to Delay array decorator'''
+    def wrapper(*args, **kwargs):
+        arr = func(*args, **kwargs)
+        if not isinstance(arr, DelayArray):
+            arr = NPArray(arr)
+        return arr
+    return wrapper
+
+
+def calc_type(func, type1, type2):
+    if 'float64' in (type1, type2):
+        return 'float64'
+    elif 'float32' in (type1, type2):
+        return 'float32'
+    elif 'int64' in (type1, type2):
+        return 'int64'
+    else:
+        return type1
+
+
+HANDLED_FUNCTIONS = {}
+
+
+def implements(np_function):
+    "Register an __array_function__ implementation for DiagonalArray objects."
+    def decorator(func):
+        HANDLED_FUNCTIONS[np_function] = func
+        return func
+    return decorator
+
+
+def arg_to_numpy_ex(arg: Any) -> NumpyEx:
+    from numbers import Number
+    if isinstance(arg, DelayArray):
+        return arg
+    elif isinstance(arg, Number):
+        return Scalar(arg)
+    else:
+        print(arg)
+        print(type(arg))
+        raise NotImplementedError
+
+
+# def func_to_numpy_ex(func):
+#     return {
+#         'matmul': Matmul,
+#         'add': Add,
+#         'multiply': Multiply
+#         }[func.__name__]
+
+
+@implements(np.diag)
+def diag(arr, k=0):
+    if isinstance(arr.ex, NPArray):
+        arr._ndarray = np.ascontiguousarray(np.diag(arr._ndarray, k))
+        assert(arr._ndarray.flags['C_CONTIGUOUS'])
+        arr.ex = NPArray(arr._ndarray)
+        return arr
+    else:
+        return NotImplemented
+
+
+@implements(np.diagflat)
+@cast
+def diagflat(arr, k=0):
+    # keep it simple for now
+    return np.diagflat(np.asarray(arr, order='C'))
+
+
+add = cast(np.add)
+dot = cast(np.dot)
+cos = cast(np.cos)
+sin = cast(np.sin)
+tan = cast(np.tan)
+subtract = cast(np.subtract)
+exp = cast(np.exp)
+power = cast(np.power)
+
+# Ones and zeros
+empty = cast(np.empty)
+empty_like = cast(np.empty_like)
+eye = cast(np.eye)
+identity = cast(np.identity)
+ones = cast(np.ones)
+ones_like = cast(np.ones_like)
+zeros = cast(np.zeros)
+zeros_like = cast(np.zeros_like)
+full = cast(np.full)
+full_like = cast(np.full_like)
+
+
+# From existing data
+
+array = cast(np.array)
+asarray = cast(np.asarray)
+asanyarray = cast(np.asanyarray)
+ascontiguousarray = cast(np.ascontiguousarray)
+asmatrix = cast(np.asmatrix)
+copy = cast(np.copy)
+frombuffer = cast(np.frombuffer)
+fromfile = cast(np.fromfile)
+fromfunction = cast(np.fromfunction)
+fromiter = cast(np.fromiter)
+fromstring = cast(np.fromstring)
+loadtxt = cast(np.loadtxt)
+
+# Numerical ranges
+arange = cast(np.arange)
+linspace = cast(np.linspace)
+logspace = cast(np.logspace)
+geomspace = cast(np.geomspace)
+
+
+# Building matrices
+tri = cast(np.tri)
+tril = cast(np.tril)
+triu = cast(np.triu)
+vander = cast(np.vander)
+
+class BaseFragment:
+    def init(self):
+        self.name = None
+        self.stmts = []
+        self.inputs = {}
+        self.outvar = None
+        self.local_vars = {}
+
+class Fragment:
+
+    def __init__(self, name: str, stmts: List[str], inputs: Dict[str,
+    BaseFragment], outvar: str, local_vars):
+
+        self.name = name
+        self.stmts = stmts
+        self.inputs = inputs
+        self.dtype = np.float32
+        self.outvar = outvar
+        self.local_vars = local_vars
+
+    def ref(self) -> str:
+        return self.name
+    
+    def to_input(self):
+        return {self.name: self.node.array}
+        
+    def to_kern(self):
+        inargs = [f"T {arg}" for arg in self.inputs]
+        kern = cupy.ElementwiseKernel(
+            ",".join(inargs),
+            f"T {self.outvar}",
+            "\n".join(self.stmts)
+        )
+
+class InputFragment(BaseFragment):
+
+    def __init__(self, arr: NPArray):
+        super().__init__()
+        self.name = arr.name
+        self.inputs[self.name] = self
+
+    def ref(self):
+        return f"{self.name}"
+
+def combine_inputs(*args: Dict[str, BaseFragment]) -> Dict[str, BaseFragment]:
+    ret = {}
+    for arg in args:
+        ret.update(arg)
+    return ret
+
+class CupyEmitter(NumpyVisitor):
+
+    def __init__(self):
+        self.ins = {}
+        self.outs = []
+        self.kernels = []
+
+    def visit_BinaryNumpyEx(self, node: BinaryNumpyEx):
+        op = node.to_op()
+        left = self.visit(node.left)
+        right = self.visit(node.right)
+        name = f"var{id(node)}"
+        stmt = f"{name} = {left.ref()} {op} {right.ref()}"
+        stmts = [stmt]
+        kern = Fragment(name, stmts, combine_inputs(left,right), name, [])
+
+    def visit_NPArray(self, node: NPArray) -> BaseFragment:
+        return InputFragment(node)
+
+def run_gpu(ex):
+    print()
+    print("foooo")
+    return []
