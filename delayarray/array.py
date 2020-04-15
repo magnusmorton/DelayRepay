@@ -93,6 +93,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         if isinstance(self.ex, num.NPArray):
             return self.ex.array
         return run_gpu(self.ex)
+    
+    def get(self):
+        return self.__array__()
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if ufunc.__name__ == 'matmul':

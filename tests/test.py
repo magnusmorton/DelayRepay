@@ -17,29 +17,30 @@ class TestElWise(unittest.TestCase):
 
     def test_scalar_add(self):
         res = self.arr + 1
-        npt.assert_array_almost_equal(res, self.np_arr + 1)
+        print(res)
+        npt.assert_array_almost_equal(res.get(), self.np_arr + 1)
 
     def test_scalar_mul(self):
         res = self.arr * 3
-        npt.assert_array_almost_equal(res, self.np_arr * 3)
+        npt.assert_array_almost_equal(res.get(), self.np_arr * 3)
 
     def test_var_add(self):
         a = 7
         res = a * self.arr
-        npt.assert_array_almost_equal(res, self.np_arr * 7)
+        npt.assert_array_almost_equal(res.get(), self.np_arr * 7)
 
     def test_axpy(self):
         def axpy(a, x, y):
             return a*x + y
         res = axpy(8, self.arr, 9)
-        npt.assert_array_almost_equal(res, axpy(8, self.np_arr, 9))
+        npt.assert_array_almost_equal(res.get(), axpy(8, self.np_arr, 9))
 
     def test_regression(self):
         def fun(mat):
             return mat + mat * 3 + 9
 
         res = fun(self.arr)
-        npt.assert_array_almost_equal(res, fun(self.np_arr))
+        npt.assert_array_almost_equal(res.get(), fun(self.np_arr))
 
     def test_ir(self):
         res = self.arr + 3
@@ -47,11 +48,11 @@ class TestElWise(unittest.TestCase):
 
     def test_cos(self):
         res = np.cos(self.arr)
-        npt.assert_array_almost_equal(res, np.cos(self.np_arr))
+        npt.assert_array_almost_equal(res.get(), np.cos(self.np_arr))
 
     def test_exp(self):
         res = self.arr ** 2
-        npt.assert_array_almost_equal(res, self.np_arr ** 2)
+        npt.assert_array_almost_equal(res.get(), self.np_arr ** 2)
 
 class TestVector(unittest.TestCase):
     # pylint: disable=C

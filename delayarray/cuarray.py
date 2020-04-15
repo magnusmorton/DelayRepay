@@ -1,9 +1,9 @@
 '''Delay array and related stuff'''
 
 from typing import Any, List, Dict
-import cupy # type: ignore
-import numpy as np # type: ignore
-import numpy.lib.mixins # type: ignore
+import cupy  # type: ignore
+import numpy as np  # type: ignore
+import numpy.lib.mixins  # type: ignore
 
 
 
@@ -21,6 +21,8 @@ FUNCS = {
 
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
+    def __init__(self, *args, **kwargs):
+        self._memo = None
 
     def __repr__(self):
         return str(self.__array__())
@@ -29,7 +31,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         # return NumpyFunction(self.ex)()
         if isinstance(self, NPArray):
             return self.array
-        return dcupy.run_gpu(self)
+        return run_gpu(self)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if ufunc.__name__ == 'matmul':
@@ -70,6 +72,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def dot(self, other, out=None):
         return np.dot(self, other)
 
+    def get(self):
+        return self.__array__().get()
+
 
 def calc_shape(left, right, op=None):
     if left == (0,):
@@ -104,6 +109,7 @@ class Funcable:
 
 class ReduceEx(NumpyEx, Funcable):
     def __init__(self, func, arg):
+        super().__init__()
         self.func = func
         self.arg = arg
 
@@ -114,6 +120,7 @@ class ReduceEx(NumpyEx, Funcable):
 class UnaryFuncEx(NumpyEx, Funcable):
 
     def __init__(self, func, arg):
+        super().__init__()
         self.arg = arg
         self.func = func
         self.shape = arg.shape
@@ -122,6 +129,7 @@ class UnaryFuncEx(NumpyEx, Funcable):
 class BinaryFuncEx(NumpyEx):
 
     def __init__(self, func, left, right):
+        super().__init__()
         self.left = left
         self.right = right
         self.func = func
@@ -146,6 +154,7 @@ class BinaryNumpyEx(NumpyEx, Funcable):
     # func: np.ufunc
 
     def __init__(self, func, left, right):
+        super().__init__()
         self.left = left
         self.right = right
         self.func = func
@@ -156,6 +165,7 @@ class MMEx(NumpyEx, Funcable):
     # arg1: NumpyEx
     # arg2: NumpyEx
     def __init__(self, arg1, arg2):
+        super().__init__()
         self.arg1 = arg1
         self.arg2 = arg2
         self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
@@ -165,6 +175,7 @@ class MVEx(NumpyEx, Funcable):
     # arg1: NumpyEx
     # arg2: NumpyEx
     def __init__(self, arg1, arg2):
+        super().__init__()
         self.arg1 = arg1
         self.arg2 = arg2
         self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
@@ -173,6 +184,7 @@ class MVEx(NumpyEx, Funcable):
 class DotEx(NumpyEx, Funcable):
 
     def __init__(self, left, right):
+        super().__init__()
         self.arg1 = left
         self.arg2 = right
         self.shape = calc_shape(left.shape, right.shape, np.dot)
@@ -197,6 +209,7 @@ class NPArray(NumpyEx, DelayArray, metaclass=MemoMeta):
     '''ndarray'''
 
     def __init__(self, array):
+        super().__init__()
         self.array = array
         self.shape = array.shape
 
@@ -211,6 +224,7 @@ class Scalar(NumpyEx):
     '''a scalar'''
     # val: Number
     def __init__(self, val):
+        super().__init__()
         self.val = val
         self.shape = (0,)
 
@@ -403,7 +417,7 @@ empty = cast(np.empty)
 empty_like = cast(np.empty_like)
 eye = cast(np.eye)
 identity = cast(np.identity)
-ones = cast(np.ones)
+ones = cast(cupy.ones)
 ones_like = cast(np.ones_like)
 zeros = cast(np.zeros)
 zeros_like = cast(np.zeros_like)
@@ -440,14 +454,14 @@ triu = cast(np.triu)
 vander = cast(np.vander)
 
 class BaseFragment:
-    def init(self):
+    def __init__(self):
         self.name = None
         self.stmts = []
         self.inputs = {}
         self.outvar = None
         self.local_vars = {}
 
-class Fragment:
+class Fragment(BaseFragment):
 
     def __init__(self, name: str, stmts: List[str], inputs: Dict[str,
     BaseFragment], outvar: str, local_vars):
@@ -465,23 +479,33 @@ class Fragment:
     def to_input(self):
         return {self.name: self.node.array}
         
-    def to_kern(self):
+    def to_kern(self) -> cupy.ElementwiseKernel:
         inargs = [f"T {arg}" for arg in self.inputs]
         kern = cupy.ElementwiseKernel(
             ",".join(inargs),
             f"T {self.outvar}",
             "\n".join(self.stmts)
         )
+        return kern
 
 class InputFragment(BaseFragment):
 
     def __init__(self, arr: NPArray):
         super().__init__()
         self.name = arr.name
-        self.inputs[self.name] = self
+        self.inputs = {self.name: arr.array}
 
-    def ref(self):
+    def ref(self) -> str:
         return f"{self.name}"
+
+class ScalarFragment(BaseFragment):
+    def __init__(self, val: Scalar):
+        super().__init__()
+        self.val = val.val
+
+    def ref(self) -> str:
+        return str(self.val)
+    
 
 def combine_inputs(*args: Dict[str, BaseFragment]) -> Dict[str, BaseFragment]:
     ret = {}
@@ -489,26 +513,38 @@ def combine_inputs(*args: Dict[str, BaseFragment]) -> Dict[str, BaseFragment]:
         ret.update(arg)
     return ret
 
-class CupyEmitter(NumpyVisitor):
+class CupyEmitter(Visitor):
 
     def __init__(self):
+        super().__init__()
         self.ins = {}
         self.outs = []
         self.kernels = []
 
-    def visit_BinaryNumpyEx(self, node: BinaryNumpyEx):
+    def visit_BinaryNumpyEx(self, node: BinaryNumpyEx) -> BaseFragment:
         op = node.to_op()
         left = self.visit(node.left)
         right = self.visit(node.right)
         name = f"var{id(node)}"
         stmt = f"{name} = {left.ref()} {op} {right.ref()}"
         stmts = [stmt]
-        kern = Fragment(name, stmts, combine_inputs(left,right), name, [])
+        kern = Fragment(name, stmts, combine_inputs(left.inputs, right.inputs), name, [])
+        self.kernels.append(kern)
+        return kern
 
     def visit_NPArray(self, node: NPArray) -> BaseFragment:
         return InputFragment(node)
 
-def run_gpu(ex):
-    print()
-    print("foooo")
-    return []
+    def visit_Scalar(self, node: Scalar) -> BaseFragment:
+        return ScalarFragment(node)
+
+
+def run_gpu(ex: NumpyEx) -> cupy.array:
+    visitor = CupyEmitter()
+    visitor.visit(ex)
+    kerns = visitor.kernels
+    assert(len(kerns))
+    for kern in kerns:
+        compiled = kern.to_kern()
+        ret = compiled(*kern.inputs.values())
+    return ret
