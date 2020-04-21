@@ -51,8 +51,9 @@ class TestElWise(unittest.TestCase):
         npt.assert_array_almost_equal(res.get(), np.cos(self.np_arr))
 
     def test_exp(self):
-        res = self.arr ** 2
+        res = self.arr ** 2.0
         npt.assert_array_almost_equal(res.get(), self.np_arr ** 2)
+
 
 class TestVector(unittest.TestCase):
     # pylint: disable=C
