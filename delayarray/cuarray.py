@@ -495,7 +495,7 @@ class Fragment(BaseFragment):
     def ref(self) -> str:
         return self.name
 
-    def expr(self) -> Optional[str]:
+    def expr(self) -> str:
         return self._expr
 
     def to_input(self):
@@ -508,7 +508,6 @@ class Fragment(BaseFragment):
             f"float32 {self.outvar}",
             f"{self.outvar} = {self._expr}"
         )
-        print(f"EXPR: {self._expr}")
         return kern
 
 
@@ -523,7 +522,7 @@ class Kernel(Fragment):
     def inputs(self) -> InputDict:
         return {self.ref(): self}
 
-    def expr(self) -> Optional[str]:
+    def expr(self) -> str:
         return self.name
 
 
@@ -537,7 +536,7 @@ class InputFragment(BaseFragment):
     def ref(self) -> str:
         return f"{self.name}"
 
-    def expr(self) -> Optional[str]:
+    def expr(self) -> str:
         return f"{self.name}"
 
 
@@ -549,7 +548,7 @@ class ScalarFragment(BaseFragment):
     def ref(self) -> str:
         return str(self.val)
 
-    def expr(self) -> Optional[str]:
+    def expr(self) -> str:
         return str(self.val)
 
 
@@ -576,20 +575,16 @@ class CupyEmitter(Visitor):
         right = self.visit(node.right, callshape=node.shape)
         name = f"var{id(node)}"
         expr = f"{left.expr()} {op} {right.expr()}"
-        print(expr)
-
+        
         # stmts = left.stmts + right.stmts + [stmt]
         if callshape is None or callshape != node.shape:
-            print(expr)
             kern: Fragment = Kernel(name,
                                     expr,
                                     combine_inputs(left.inputs, right.inputs),
                                     name,
                                     [])
-            print("TIIEINEINENEINEINEN")
             self.kernels.append(kern)
         else:
-            print("NOPE")
             kern = Fragment(name,
                             expr,
                             combine_inputs(left.inputs, right.inputs),
@@ -661,7 +656,6 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
     assert(len(kerns))
     results: Dict[str, cupy.array] = {}
     for kern in kerns:
-        print("KERN")
         compiled = kern.to_kern()
         inputs = [results[key] if isinstance(value, Kernel) else value for key, value in kern.kernel_args.items()]
                 
