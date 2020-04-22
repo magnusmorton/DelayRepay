@@ -1,6 +1,6 @@
 '''Delay array and related stuff'''
 
-from typing import Any, List, Dict, Tuple
+from typing import Any, List, Dict, Tuple, Optional
 import cupy  # type: ignore
 import numpy as np  # type: ignore
 import numpy.lib.mixins  # type: ignore
@@ -454,29 +454,39 @@ tril = cast(np.tril)
 triu = cast(np.triu)
 vander = cast(np.vander)
 
+InputDict = Dict[str, 'BaseFragment']
+
 class BaseFragment:
     def __init__(self):
         self.name = None
         self.stmts = []
+        self._expr = None
         self._inputs = {}
         self.outvar = None
         self.local_vars = {}
 
     @property
-    def inputs(self):
+    def inputs(self) -> InputDict:
         return self._inputs
+
+    @property
+    def kernel_args(self) -> InputDict:
+        return self._inputs
+
+
+
 
 
 class Fragment(BaseFragment):
 
-    def __init__(self, name: str, stmts: List[str],
-                 inputs: Dict[str, BaseFragment],
+    def __init__(self,
+                 name: str,
+                 expr: str,
+                 inputs: InputDict,
                  outvar: str,
                  local_vars):
-        print("bnehrastenhrsnaethrasneiht")
-        print(stmts)
         self.name = name
-        self.stmts = stmts
+        self._expr = expr
         self._inputs = inputs
         self.dtype = np.float32
         self.outvar = outvar
@@ -485,17 +495,20 @@ class Fragment(BaseFragment):
     def ref(self) -> str:
         return self.name
 
+    def expr(self) -> Optional[str]:
+        return self._expr
+
     def to_input(self):
         return {self.name: self.node.array}
 
     def to_kern(self) -> cupy.ElementwiseKernel:
         inargs = [f"float32 {arg}" for arg in self.kernel_args]
-        print(self.stmts)
         kern = cupy.ElementwiseKernel(
             ",".join(inargs),
             f"float32 {self.outvar}",
-            ";\n".join(self.stmts)
+            f"{self.outvar} = {self._expr}"
         )
+        print(f"EXPR: {self._expr}")
         return kern
 
 
@@ -507,12 +520,11 @@ class Kernel(Fragment):
         super().__init__(*args, **kwargs)
 
     @property
-    def inputs(self):
+    def inputs(self) -> InputDict:
         return {self.ref(): self}
 
-    @property
-    def kernel_args(self):
-        return self._inputs
+    def expr(self) -> Optional[str]:
+        return self.name
 
 
 class InputFragment(BaseFragment):
@@ -525,6 +537,10 @@ class InputFragment(BaseFragment):
     def ref(self) -> str:
         return f"{self.name}"
 
+    def expr(self) -> Optional[str]:
+        return f"{self.name}"
+
+
 class ScalarFragment(BaseFragment):
     def __init__(self, val: Scalar):
         super().__init__()
@@ -532,9 +548,12 @@ class ScalarFragment(BaseFragment):
 
     def ref(self) -> str:
         return str(self.val)
-    
 
-def combine_inputs(*args: Dict[str, BaseFragment]) -> Dict[str, BaseFragment]:
+    def expr(self) -> Optional[str]:
+        return str(self.val)
+
+
+def combine_inputs(*args: InputDict) -> InputDict:
     ret = {}
     for arg in args:
         ret.update(arg)
@@ -556,20 +575,23 @@ class CupyEmitter(Visitor):
         left = self.visit(node.left, callshape=node.shape)
         right = self.visit(node.right, callshape=node.shape)
         name = f"var{id(node)}"
-        stmt = f"{name} = {left.ref()} {op} {right.ref()}"
-        stmts = left.stmts + right.stmts + [stmt]
-        print(stmts)
+        expr = f"{left.expr()} {op} {right.expr()}"
+        print(expr)
+
+        # stmts = left.stmts + right.stmts + [stmt]
         if callshape is None or callshape != node.shape:
+            print(expr)
             kern: Fragment = Kernel(name,
-                                    stmts,
+                                    expr,
                                     combine_inputs(left.inputs, right.inputs),
                                     name,
                                     [])
             print("TIIEINEINENEINEINEN")
             self.kernels.append(kern)
         else:
+            print("NOPE")
             kern = Fragment(name,
-                            stmts,
+                            expr,
                             combine_inputs(left.inputs, right.inputs),
                             name,
                             [])
@@ -580,18 +602,17 @@ class CupyEmitter(Visitor):
                           callshape: Tuple[int, int] = None) -> BaseFragment:
         inner = self.visit(node.arg)
         name = f"var{id(node)}"
-        stmt = f"{name} = {node.func.__name__}({inner.ref()})"
-        stmts = [stmt]
+        expr = f"{node.func.__name__}({inner.expr()})"
         if callshape is None or callshape != node.shape:
             kern: Fragment = Kernel(name,
-                                    stmts,
+                                    expr,
                                     inner.inputs,
                                     name,
                                     [])
             self.kernels.append(kern)
         else:
             kern = Fragment(name,
-                            stmts,
+                            expr,
                             inner.inputs,
                             name,
                             [])
@@ -605,19 +626,18 @@ class CupyEmitter(Visitor):
         right = self.visit(node.right)
         name = f"var{id(node)}"
         # TODO: sort out the float literal thing
-        stmt = f"{name} = {op}({left.ref()}, {right.ref()}f)"
-        stmts = [stmt]
+        expr = f"{op}({left.ref()}, {right.ref()}f)"
 
         if callshape is None or callshape != node.shape:
             kern: Fragment = Kernel(name,
-                                    stmts,
+                                    expr,
                                     combine_inputs(left.inputs, right.inputs),
                                     name,
                                     [])
             self.kernels.append(kern)
         else:
             kern = Fragment(name,
-                            stmts,
+                            expr,
                             combine_inputs(left.inputs, right.inputs),
                             name,
                             [])
@@ -639,11 +659,10 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
     visitor.visit(ex)
     kerns = visitor.kernels
     assert(len(kerns))
-    results = {}
+    results: Dict[str, cupy.array] = {}
     for kern in kerns:
         print("KERN")
         compiled = kern.to_kern()
-        print(compiled)
         inputs = [results[key] if isinstance(value, Kernel) else value for key, value in kern.kernel_args.items()]
                 
         ret = compiled(*inputs)
