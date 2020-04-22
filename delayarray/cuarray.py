@@ -462,8 +462,7 @@ class BaseFragment:
         self.stmts = []
         self._expr = None
         self._inputs = {}
-        self.outvar = None
-
+        
     @property
     def inputs(self) -> InputDict:
         return self._inputs
@@ -481,13 +480,11 @@ class Fragment(BaseFragment):
     def __init__(self,
                  name: str,
                  expr: str,
-                 inputs: InputDict,
-                 outvar: str):
+                 inputs: InputDict):
         self.name = name
         self._expr = expr
         self._inputs = inputs
         self.dtype = np.float32
-        self.outvar = outvar
 
     def ref(self) -> str:
         return self.name
@@ -502,8 +499,8 @@ class Fragment(BaseFragment):
         inargs = [f"float32 {arg}" for arg in self.kernel_args]
         kern = cupy.ElementwiseKernel(
             ",".join(inargs),
-            f"float32 {self.outvar}",
-            f"{self.outvar} = {self._expr}"
+            f"float32 {self.name}",
+            f"{self.name} = {self._expr}"
         )
         return kern
 
@@ -579,14 +576,12 @@ class CupyEmitter(Visitor):
         if callshape is None or callshape != node.shape:
             kern: Fragment = Kernel(name,
                                     expr,
-                                    combine_inputs(left.inputs, right.inputs),
-                                    name)
+                                    combine_inputs(left.inputs, right.inputs))
             self.kernels.append(kern)
         else:
             kern = Fragment(name,
                             expr,
-                            combine_inputs(left.inputs, right.inputs),
-                            name)
+                            combine_inputs(left.inputs, right.inputs))
         return kern
 
     def visit_UnaryFuncEx(self,
@@ -598,14 +593,12 @@ class CupyEmitter(Visitor):
         if callshape is None or callshape != node.shape:
             kern: Fragment = Kernel(name,
                                     expr,
-                                    inner.inputs,
-                                    name)
+                                    inner.inputs)
             self.kernels.append(kern)
         else:
             kern = Fragment(name,
                             expr,
-                            inner.inputs,
-                            name)
+                            inner.inputs)
         return kern
 
     def visit_BinaryFuncEx(self,
@@ -621,14 +614,12 @@ class CupyEmitter(Visitor):
         if callshape is None or callshape != node.shape:
             kern: Fragment = Kernel(name,
                                     expr,
-                                    combine_inputs(left.inputs, right.inputs),
-                                    name)
+                                    combine_inputs(left.inputs, right.inputs))
             self.kernels.append(kern)
         else:
             kern = Fragment(name,
                             expr,
-                            combine_inputs(left.inputs, right.inputs),
-                            name)
+                            combine_inputs(left.inputs, right.inputs))
         return kern
 
     def visit_NPArray(self,
