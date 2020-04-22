@@ -463,7 +463,6 @@ class BaseFragment:
         self._expr = None
         self._inputs = {}
         self.outvar = None
-        self.local_vars = {}
 
     @property
     def inputs(self) -> InputDict:
@@ -483,14 +482,12 @@ class Fragment(BaseFragment):
                  name: str,
                  expr: str,
                  inputs: InputDict,
-                 outvar: str,
-                 local_vars):
+                 outvar: str):
         self.name = name
         self._expr = expr
         self._inputs = inputs
         self.dtype = np.float32
         self.outvar = outvar
-        self.local_vars = local_vars
 
     def ref(self) -> str:
         return self.name
@@ -512,8 +509,7 @@ class Fragment(BaseFragment):
 
 
 class Kernel(Fragment):
-    #TODO: basically the same as Fragment, except inputs returns something
-    #different
+
     def __init__(self, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
@@ -549,7 +545,10 @@ class ScalarFragment(BaseFragment):
         return str(self.val)
 
     def expr(self) -> str:
-        return str(self.val)
+        suffix = ""
+        if isinstance(self.val, float):
+            suffix = 'f'
+        return f"{self.val}{suffix}"
 
 
 def combine_inputs(*args: InputDict) -> InputDict:
@@ -581,15 +580,13 @@ class CupyEmitter(Visitor):
             kern: Fragment = Kernel(name,
                                     expr,
                                     combine_inputs(left.inputs, right.inputs),
-                                    name,
-                                    [])
+                                    name)
             self.kernels.append(kern)
         else:
             kern = Fragment(name,
                             expr,
                             combine_inputs(left.inputs, right.inputs),
-                            name,
-                            [])
+                            name)
         return kern
 
     def visit_UnaryFuncEx(self,
@@ -602,15 +599,13 @@ class CupyEmitter(Visitor):
             kern: Fragment = Kernel(name,
                                     expr,
                                     inner.inputs,
-                                    name,
-                                    [])
+                                    name)
             self.kernels.append(kern)
         else:
             kern = Fragment(name,
                             expr,
                             inner.inputs,
-                            name,
-                            [])
+                            name)
         return kern
 
     def visit_BinaryFuncEx(self,
@@ -621,21 +616,19 @@ class CupyEmitter(Visitor):
         right = self.visit(node.right)
         name = f"var{id(node)}"
         # TODO: sort out the float literal thing
-        expr = f"{op}({left.ref()}, {right.ref()}f)"
+        expr = f"{op}({left.expr()}, {right.expr()})"
 
         if callshape is None or callshape != node.shape:
             kern: Fragment = Kernel(name,
                                     expr,
                                     combine_inputs(left.inputs, right.inputs),
-                                    name,
-                                    [])
+                                    name)
             self.kernels.append(kern)
         else:
             kern = Fragment(name,
                             expr,
                             combine_inputs(left.inputs, right.inputs),
-                            name,
-                            [])
+                            name)
         return kern
 
     def visit_NPArray(self,
