@@ -53,21 +53,18 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             return self._dot_mm(args, kwargs)
         if is_matrix_vector(args[0].shape, args[1].shape):
             return self._dot_mv(args, kwargs)
-        res = np.array(DelayArray(self.shape, ops=(np.dot, args, kwargs),
-                                  ex=DotEx(args[0], args[1])))
-        return np.sum(res)
+
+        left = args[0].__array__()
+
+        print(left)
+        right = args[1].__array__()
+        print(right)
+        return cupy.dot(left, right)
 
     def __array_function__(self, func, types, args, kwargs):
         if func.__name__ == "dot":
             return self._dot(args, kwargs)
         return HANDLED_FUNCTIONS[func](*args, **kwargs)
-
-    def astype(self, *args, **kwargs):
-        if isinstance(self, NPArray):
-            self.array = self.array.astype(*args, **kwargs)
-        else:
-            raise Exception("Dont call astype here")
-        return self
 
     def dot(self, other, out=None):
         return np.dot(self, other)
@@ -220,6 +217,14 @@ class NPArray(NumpyEx, DelayArray, metaclass=MemoMeta):
     def __eq__(self, other):
         return self.array is other.array
 
+    def astype(self, *args, **kwargs):
+        old = self.array
+        cast_arr = self.array.astype(*args, **kwargs)
+        del(NPArray._cache[id(old)])
+        NPArray._cache[id(cast_arr)] = self
+        self.array = cast_arr
+        return self
+
 
 class Scalar(NumpyEx):
     '''a scalar'''
@@ -273,48 +278,6 @@ def is_matrix_matrix(left, right):
 
 def is_matrix_vector(left, right):
     return len(left) > 1 and len(right) == 1
-
-
-class ShapeAnnotator(NumpyVisitor):
-
-    def calc_shape(left, right, op=None):
-        if left == (0,):
-            return right
-        if right is (0,):
-            return left
-        if op.__name__ in OPS:
-            return left
-        if op.__name__ == 'dot':
-            # for now
-            if len(left) > 1 and len(right) > 1:
-                return (left[0], right[1])
-            elif len(left) > 1:
-                return (left[0],)
-            else:
-                return (0,)
-
-    def visit_BinaryNumpyEx(self, node):
-        left = self.visit(node.left)
-        right = self.visit(node.right)
-        node.shape = ShapeAnnotator.calc_shape(left.shape,
-                                               right.shape,
-                                               node.func)
-        return node
-
-    def visit_NPArray(self, node):
-        node.shape = node.array.shape
-        return node
-
-    def visit_Scalar(self, node):
-        node.shape = (0,)
-        return node
-
-    def visit_DotEx(self, node):
-        left = self.visit(node.arg1)
-        right = self.visit(node.arg2)
-        node.shape = ShapeAnnotator.calc_shape(left.shape, right.shape, np.dot)
-        node._inshape = left.shape
-        return node
 
 
 class ReduceTransformer(NumpyVisitor):
@@ -422,7 +385,7 @@ ones = cast(cupy.ones)
 ones_like = cast(np.ones_like)
 zeros = cast(np.zeros)
 zeros_like = cast(np.zeros_like)
-full = cast(np.full)
+full = cast(cupy.full)
 full_like = cast(np.full_like)
 
 

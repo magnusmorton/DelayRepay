@@ -1,7 +1,6 @@
 '''Test simple cl examples'''
 import unittest
-from delayarray import ones, full
-from delayarray.num import NPArray
+from delayarray import ones, full, NPArray
 import numpy as np
 import numpy.testing as npt
 
@@ -66,7 +65,7 @@ class TestVector(unittest.TestCase):
 
     def test_vecadd(self):
         res = self.arr + self.arr2
-        npt.assert_array_almost_equal(res, self.np_arr + self.np_arr2)
+        npt.assert_array_almost_equal(res.get(), self.np_arr + self.np_arr2)
 
     def test_vecmul(self):
         res = self.arr * self.arr2
@@ -126,6 +125,12 @@ class TestMeta(unittest.TestCase):
         ar2 = NPArray(arr)
         self.assertIs(ar1, ar2)
 
+    def test_no_memoize(self):
+        import cupy
+        arr = full((3,), 5).astype(np.float32)
+        arr2 = full((3,), 3).astype(np.float32)
+        self.assertIsNot(arr, arr2)
 
+    
 if __name__ == '__main__':
     unittest.main()
