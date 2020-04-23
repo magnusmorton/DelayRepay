@@ -49,16 +49,13 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def _dot(self, args, kwargs):
         # scalar result dot
         args = [arg_to_numpy_ex(arg) for arg in args]
-        if is_matrix_matrix(args[0].shape, args[1].shape):
-            return self._dot_mm(args, kwargs)
-        if is_matrix_vector(args[0].shape, args[1].shape):
-            return self._dot_mv(args, kwargs)
+        # if is_matrix_matrix(args[0].shape, args[1].shape):
+        #     return self._dot_mm(args, kwargs)
+        # if is_matrix_vector(args[0].shape, args[1].shape):
+        #     return self._dot_mv(args, kwargs)
 
         left = args[0].__array__()
-
-        print(left)
         right = args[1].__array__()
-        print(right)
         return cupy.dot(left, right)
 
     def __array_function__(self, func, types, args, kwargs):

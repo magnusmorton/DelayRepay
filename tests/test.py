@@ -69,7 +69,7 @@ class TestVector(unittest.TestCase):
 
     def test_vecmul(self):
         res = self.arr * self.arr2
-        npt.assert_array_almost_equal(res, self.np_arr * self.np_arr2)
+        npt.assert_array_almost_equal(res.get(), self.np_arr * self.np_arr2)
 
     def test_dot_method(self):
         res = self.arr.dot(self.arr2)
@@ -97,24 +97,24 @@ class TestMatrix(unittest.TestCase):
 
     def test_scalar_mul(self):
         res = self.mat * 3
-        npt.assert_array_almost_equal(res, self.np_mat * 3)
+        npt.assert_array_almost_equal(res.get(), self.np_mat * 3)
 
     def test_matvec(self):
         res = self.mat @ self.vec
         print(res)
         test = self.np_mat @ self.np_vec
-        npt.assert_array_almost_equal(res, test)
+        npt.assert_array_almost_equal(res.get(), test)
 
     def test_kuba(self):
         a = full((64, 64), 10.0, dtype=np.float32)
         b = full((64,), 2.0, dtype=np.float32)
         an = np.full((64, 64), 10.0, dtype=np.float32)
         bn = np.full((64,), 2.0, dtype=np.float32)
-        npt.assert_array_almost_equal(a @ b, an @ bn)
+        npt.assert_array_almost_equal((a @ b).get(), an @ bn)
 
     def test_gemm(self):
         res = self.mat @ self.mat
-        npt.assert_array_almost_equal(res, self.np_mat @ self.np_mat)
+        npt.assert_array_almost_equal(res.get(), self.np_mat @ self.np_mat)
 
 
 class TestMeta(unittest.TestCase):
