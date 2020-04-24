@@ -1,5 +1,5 @@
-import cupy
-data = cupy.random.random((1000, 1000))
+import delayarray as cupy
+data = cupy.random.random((83361790,))
 
 #@cupy.fuse(kernel_name='func')
 def func(arg):
