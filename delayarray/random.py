@@ -1,7 +1,7 @@
-import numpy.random
+import cupy.random
 #from numpy.random import *
-from .array import cast
+from .cuarray import cast
 
-rand = cast(numpy.random.rand)
-randn = cast(numpy.random.randn)
-random = cast(numpy.random.random)
+rand = cast(cupy.random.rand)
+randn = cast(cupy.random.randn)
+random = cast(cupy.random.random)
