@@ -53,6 +53,10 @@ class TestElWise(unittest.TestCase):
         res = self.arr ** 2.0
         npt.assert_array_almost_equal(res.get(), self.np_arr ** 2)
 
+    def test_fuse_bench(self):
+        res = np.sin(self.arr) ** 2 + np.cos(self.arr) ** 2
+        print(res.get())
+
 
 class TestVector(unittest.TestCase):
     # pylint: disable=C
@@ -85,6 +89,8 @@ class TestVector(unittest.TestCase):
         res = self.arr @ self.arr2
         test = self.np_arr @ self.np_arr2
         self.assertEqual(res, test)
+
+
 
 
 class TestMatrix(unittest.TestCase):
