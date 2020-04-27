@@ -1,10 +1,14 @@
-import delayarray as cupy
-import numpy as np
+import sys
+import importlib
+
+pkg = sys.argv[1]
+np = importlib.import_module(pkg)
+
 
 LAPTOP_MAX = 83361790
 
 size = LAPTOP_MAX
-data = cupy.random.random((size,))
+data = np.random.random((size,))
 
 #@cupy.fuse(kernel_name='func')
 def func(arg):

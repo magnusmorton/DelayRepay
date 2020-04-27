@@ -347,14 +347,14 @@ def diagflat(arr, k=0):
     return np.diagflat(np.asarray(arr, order='C'))
 
 
-add = cast(np.add)
-dot = cast(np.dot)
-cos = cast(np.cos)
-sin = cast(np.sin)
-tan = cast(np.tan)
-subtract = cast(np.subtract)
-exp = cast(np.exp)
-power = cast(np.power)
+add = np.add
+dot = np.dot
+cos = np.cos
+sin = np.sin
+tan = np.tan
+subtract = np.subtract
+exp = np.exp
+power = np.power
 
 # Ones and zeros
 empty = cast(np.empty)
