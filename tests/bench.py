@@ -1,8 +1,13 @@
 import delayarray as cupy
-data = cupy.random.random((83361790,))
+import numpy as np
+
+LAPTOP_MAX = 83361790
+
+size = LAPTOP_MAX
+data = cupy.random.random((size,))
 
 #@cupy.fuse(kernel_name='func')
 def func(arg):
-    return cupy.sin(arg) ** 2 + cupy.cos(arg) ** 2
+    return np.sin(arg) ** 2 + np.cos(arg) ** 2
 
 print(func(data))
