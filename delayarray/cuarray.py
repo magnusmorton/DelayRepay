@@ -277,23 +277,6 @@ def is_matrix_vector(left, right):
     return len(left) > 1 and len(right) == 1
 
 
-class ReduceTransformer(NumpyVisitor):
-    def visit_DotEx(self, node):
-        # TODO This is just for vector x vector
-        left = self.visit(node.arg1)
-        right = self.visit(node.arg2)
-
-        if is_matrix_vector(left.shape, right.shape):
-            return MVEx(left, right, node.shape, node._inshape)
-        else:
-            muls = BinaryNumpyEx(np.multiply, left, right)
-            muls.shape = node._inshape
-            red = ReduceEx(np.add, muls)
-            red.shape = node._inshape
-            red._inshape = node._inshape
-            return red
-
-
 def cast(func):
     '''cast to Delay array decorator'''
     def wrapper(*args, **kwargs):
@@ -456,10 +439,10 @@ class Fragment(BaseFragment):
         return {self.name: self.node.array}
 
     def to_kern(self) -> cupy.ElementwiseKernel:
-        inargs = [f"float32 {arg}" for arg in self.kernel_args]
+        inargs = [f"T {arg}" for arg in self.kernel_args]
         kern = cupy.ElementwiseKernel(
             ",".join(inargs),
-            f"float32 {self.name}",
+            f"T {self.name}",
             f"{self.name} = {self._expr}"
         )
         return kern
