@@ -8,10 +8,10 @@ np = importlib.import_module(pkg)
 LAPTOP_MAX = 83361790
 
 size = LAPTOP_MAX
-data = np.random.random((size,))
+data = np.random.random((size,)).astype("float32")
 
 #@cupy.fuse(kernel_name='func')
 def func(arg):
-    return np.sin(arg) ** 2 + np.cos(arg) ** 2
+    return np.sin(arg) ** 2.0 + np.cos(arg) ** 2.0
 
 print(func(data))

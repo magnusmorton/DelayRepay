@@ -7,7 +7,7 @@ import numpy.testing as npt
 SIZE = 64
 
 
-class TestElWise(unittest.TestCase):
+class TestElwise(unittest.TestCase):
     # pylint: disable=C
 
     def setUp(self):
@@ -54,8 +54,9 @@ class TestElWise(unittest.TestCase):
         npt.assert_array_almost_equal(res.get(), self.np_arr ** 2)
 
     def test_fuse_bench(self):
-        res = np.sin(self.arr) ** 2 + np.cos(self.arr) ** 2
-        print(res.get())
+        res = np.sin(self.arr) ** 2.0 + np.cos(self.arr) ** 2.0
+        resn = np.sin(self.np_arr) ** 2 + np.cos(self.np_arr) ** 2
+        npt.assert_array_almost_equal(res.get(), resn)
 
 
 class TestVector(unittest.TestCase):
