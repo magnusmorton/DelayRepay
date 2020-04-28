@@ -423,7 +423,7 @@ class Fragment(BaseFragment):
     def __init__(self,
                  name: str,
                  expr: str,
-                 inputs: InputDict):
+                 inputs: InputDict) -> None:
         self.name = name
         self._expr = expr
         self._inputs = inputs
@@ -464,7 +464,7 @@ class Kernel(Fragment):
 
 class InputFragment(BaseFragment):
 
-    def __init__(self, arr: NPArray):
+    def __init__(self, arr: NPArray) -> None:
         super().__init__()
         self.name = arr.name
         self._inputs = {self.name: arr.array}
@@ -477,7 +477,7 @@ class InputFragment(BaseFragment):
 
 
 class ScalarFragment(BaseFragment):
-    def __init__(self, val: Scalar):
+    def __init__(self, val: Scalar) -> None:
         super().__init__()
         self.val = val.val
 
@@ -548,8 +548,8 @@ class CupyEmitter(Visitor):
                            node: BinaryFuncEx,
                            callshape: Tuple[int, int] = None) -> BaseFragment:
         op = node.to_op()
-        left = self.visit(node.left)
-        right = self.visit(node.right)
+        left = self.visit(node.left, callshape=node.shape)
+        right = self.visit(node.right, callshape=node.shape)
         name = f"var{id(node)}"
         # TODO: sort out the float literal thing
         expr = f"{op}({left.expr()}, {right.expr()})"
