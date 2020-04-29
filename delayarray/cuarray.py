@@ -122,6 +122,7 @@ class UnaryFuncEx(NumpyEx, Funcable):
         self.arg = arg
         self.func = func
         self.shape = arg.shape
+        self.dtype = arg.dtype
 
 
 class BinaryFuncEx(NumpyEx):
@@ -158,6 +159,7 @@ class BinaryNumpyEx(NumpyEx, Funcable):
         self.right = right
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
+        self.dtype = calc_type(left, right)
 
 
 class MMEx(NumpyEx, Funcable):
@@ -328,8 +330,6 @@ def arg_to_numpy_ex(arg: Any) -> NumpyEx:
     elif isinstance(arg, Number):
         return Scalar(arg)
     else:
-        print(arg)
-        print(type(arg))
         raise NotImplementedError
 
 
