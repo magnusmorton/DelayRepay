@@ -11,8 +11,8 @@ class TestElwise(unittest.TestCase):
     # pylint: disable=C
 
     def setUp(self):
-        self.arr = ones(SIZE).astype(np.float32)
-        self.np_arr = np.ones(SIZE).astype(np.float32)
+        self.arr = ones(SIZE)
+        self.np_arr = np.ones(SIZE)
 
     def test_scalar_add(self):
         res = self.arr + 1
@@ -50,11 +50,11 @@ class TestElwise(unittest.TestCase):
         npt.assert_array_almost_equal(res.get(), np.cos(self.np_arr))
 
     def test_exp(self):
-        res = self.arr ** 2.0
+        res = self.arr ** 2
         npt.assert_array_almost_equal(res.get(), self.np_arr ** 2)
 
     def test_fuse_bench(self):
-        res = np.sin(self.arr) ** 2.0 + np.cos(self.arr) ** 2.0
+        res = np.sin(self.arr) ** 2 + np.cos(self.arr) ** 2
         resn = np.sin(self.np_arr) ** 2 + np.cos(self.np_arr) ** 2
         npt.assert_array_almost_equal(res.get(), resn)
 

@@ -91,6 +91,9 @@ def calc_shape(left, right, op=None):
 
 class NumpyEx(DelayArray):
     '''Numpy expression'''
+
+    def __init__(self):
+        self.dtype = None
     
     @property
     def name(self):
@@ -129,7 +132,8 @@ class BinaryFuncEx(NumpyEx):
         self.right = right
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
-
+        self.dtype = calc_type(left, right)
+        
     def to_op(self):
         return FUNCS[self.func.__name__]
 
@@ -207,6 +211,7 @@ class NPArray(NumpyEx, DelayArray, metaclass=MemoMeta):
         super().__init__()
         self.array = array
         self.shape = array.shape
+        self.dtype = array.dtype
 
     def __hash__(self):
         return id(self.array)
@@ -287,15 +292,22 @@ def cast(func):
     return wrapper
 
 
-def calc_type(func, type1, type2):
-    if 'float64' in (type1, type2):
-        return 'float64'
-    elif 'float32' in (type1, type2):
-        return 'float32'
-    elif 'int64' in (type1, type2):
-        return 'int64'
-    else:
-        return type1
+# def calc_type(func, type1, type2):
+#     if 'float64' in (type1, type2):
+#         return 'float64'
+#     elif 'float32' in (type1, type2):
+#         return 'float32'
+#     elif 'int64' in (type1, type2):
+#         return 'int64'
+#     else:
+#         return type1
+
+def calc_type(node1: NumpyEx, node2: NumpyEx) -> np.dtype:
+    if node1.dtype is not None:
+        node2.dtype = node1.dtype
+        return node1.dtype
+    node1.dtype = node2.dtype
+    return node2.dtype
 
 
 HANDLED_FUNCTIONS = {}
@@ -476,19 +488,26 @@ class InputFragment(BaseFragment):
         return f"{self.name}"
 
 
+dtype_map = {np.dtype("float32"): "float",
+             np.dtype("float64"): "double",
+             np.dtype("int32"): "int",
+             np.dtype("int64"): "long"}
+
+
 class ScalarFragment(BaseFragment):
     def __init__(self, val: Scalar) -> None:
         super().__init__()
         self.val = val.val
+        self.ctype = dtype_map.get(val.dtype)
 
     def ref(self) -> str:
         return str(self.val)
 
     def expr(self) -> str:
-        suffix = ""
-        if isinstance(self.val, float):
-            suffix = 'f'
-        return f"{self.val}{suffix}"
+        prefix = ""
+        if self.ctype:
+            prefix = f"({self.ctype})"
+        return f"{prefix}{self.val}"
 
 
 def combine_inputs(*args: InputDict) -> InputDict:
