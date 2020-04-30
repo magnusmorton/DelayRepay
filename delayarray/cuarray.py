@@ -227,6 +227,7 @@ class NPArray(NumpyEx, DelayArray, metaclass=MemoMeta):
         del(NPArray._cache[id(old)])
         NPArray._cache[id(cast_arr)] = self
         self.array = cast_arr
+        self.dtype = cast_arr.dtype
         return self
 
 
@@ -488,26 +489,33 @@ class InputFragment(BaseFragment):
         return f"{self.name}"
 
 
-dtype_map = {np.dtype("float32"): "float",
-             np.dtype("float64"): "double",
-             np.dtype("int32"): "int",
-             np.dtype("int64"): "long"}
+# dtype_map = {np.dtype("float32"): "float",
+#              np.dtype("float64"): "double",
+#              np.dtype("int32"): "int",
+#              np.dtype("int64"): "long"}
 
+# dtype_map = {np.dtype("float32"): "f",
+#              np.dtype("float64"): "",
+#              np.dtype("int32"): "",
+#              np.dtype("int64"): ""}
 
 class ScalarFragment(BaseFragment):
     def __init__(self, val: Scalar) -> None:
         super().__init__()
         self.val = val.val
-        self.ctype = dtype_map.get(val.dtype)
+        self.dtype = val.dtype
 
     def ref(self) -> str:
         return str(self.val)
 
     def expr(self) -> str:
-        prefix = ""
-        if self.ctype:
-            prefix = f"({self.ctype})"
-        return f"{prefix}{self.val}"
+        suffix = ""
+        if isinstance(self.val, int):
+            if self.dtype == np.dtype("float64"):
+                suffix = ".0"
+            if self.dtype == np.dtype("float32"):
+                suffix = ".0f"
+        return f"{self.val}{suffix}"
 
 
 def combine_inputs(*args: InputDict) -> InputDict:

@@ -53,6 +53,11 @@ class TestElwise(unittest.TestCase):
         res = self.arr ** 2
         npt.assert_array_almost_equal(res.get(), self.np_arr ** 2)
 
+    def test_exp32(self):
+        arr = self.arr.astype(np.float32)
+        res = arr ** 2
+        npt.assert_array_almost_equal(res.get(), self.np_arr.astype(np.float32) ** 2)
+
     def test_fuse_bench(self):
         res = np.sin(self.arr) ** 2 + np.cos(self.arr) ** 2
         resn = np.sin(self.np_arr) ** 2 + np.cos(self.np_arr) ** 2
