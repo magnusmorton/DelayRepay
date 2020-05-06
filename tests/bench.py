@@ -8,7 +8,9 @@ np = importlib.import_module(pkg)
 
 LAPTOP_MAX = 83361790
 
-size = LAPTOP_MAX
+SPA_MAX = 153000000
+
+size = SPA_MAX
 data = np.random.random((size,))
 
 #@cupy.fuse(kernel_name='func')
