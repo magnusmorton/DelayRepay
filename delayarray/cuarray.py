@@ -21,8 +21,12 @@ FUNCS = {
 
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
+    _id: int = 0
+    
     def __init__(self, *args, **kwargs):
         self._memo = None
+        self._id = DelayArray._id
+        DelayArray._id += 1
 
     def __repr__(self):
         return str(self.__array__())
@@ -93,11 +97,12 @@ class NumpyEx(DelayArray):
     '''Numpy expression'''
 
     def __init__(self):
+        super().__init__()
         self.dtype = None
     
     @property
     def name(self):
-        return f"var{id(self)}"
+        return f"var{self._id}"
 
 
 class Funcable:
@@ -539,7 +544,7 @@ class CupyEmitter(Visitor):
         op = node.to_op()
         left = self.visit(node.left, callshape=node.shape)
         right = self.visit(node.right, callshape=node.shape)
-        name = f"var{id(node)}"
+        name = node.name
         expr = f"{left.expr()} {op} {right.expr()}"
         
         # stmts = left.stmts + right.stmts + [stmt]
@@ -558,7 +563,7 @@ class CupyEmitter(Visitor):
                           node: UnaryFuncEx,
                           callshape: Tuple[int, int] = None) -> BaseFragment:
         inner = self.visit(node.arg)
-        name = f"var{id(node)}"
+        name = node.name
         expr = f"{node.func.__name__}({inner.expr()})"
         if callshape is None or callshape != node.shape:
             kern: Fragment = Kernel(name,
@@ -577,7 +582,7 @@ class CupyEmitter(Visitor):
         op = node.to_op()
         left = self.visit(node.left, callshape=node.shape)
         right = self.visit(node.right, callshape=node.shape)
-        name = f"var{id(node)}"
+        name = node.name
         # TODO: sort out the float literal thing
         expr = f"{op}({left.expr()}, {right.expr()})"
 
