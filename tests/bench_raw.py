@@ -18,8 +18,8 @@ def func(arg):
 kern = np.ElementwiseKernel(
     'T x',
     'T z',
-    'z = pow(sin(x), 2.0) + pow(cos(x), 2.0)',
-    'kern'
+    'z = sin(x) * sin(x) + cos(x) * cos(x)',
+    'kern1234'
 )
 
 #then = perf_counter()
