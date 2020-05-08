@@ -144,11 +144,24 @@ class BinaryFuncEx(NumpyEx):
         return FUNCS[self.func.__name__]
 
 
+def pow_ex(func, left, right):
+    if not isinstance(right.val, int):
+        return BinaryFuncEx(func, left, right)
+    ex = left
+    for i in range(right.val - 1):
+        # will give odd expression tree, but OK
+        ex = BinaryNumpyEx(multiply, ex, left)
+
+    return ex
+
+
 def create_ex(func, args):
     if func.__name__ in OPS:
         return BinaryNumpyEx(func, *args)
     if len(args) == 1:
         return UnaryFuncEx(func, *args)
+    if func.__name__ == 'power':
+        return pow_ex(func, *args)
     return BinaryFuncEx(func, *args)
 
 
@@ -366,6 +379,7 @@ def diagflat(arr, k=0):
 
 
 add = np.add
+multiply = np.multiply
 dot = np.dot
 cos = np.cos
 sin = np.sin
@@ -514,13 +528,7 @@ class ScalarFragment(BaseFragment):
         return str(self.val)
 
     def expr(self) -> str:
-        suffix = ""
-        if isinstance(self.val, int):
-            if self.dtype == np.dtype("float64"):
-                suffix = ".0"
-            if self.dtype == np.dtype("float32"):
-                suffix = ".0f"
-        return f"{self.val}{suffix}"
+        return str(self.val)
 
 
 def combine_inputs(*args: InputDict) -> InputDict:
