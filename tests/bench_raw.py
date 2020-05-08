@@ -1,6 +1,6 @@
 import sys
 import importlib
-from time import perf_counter
+import timeit
 
 pkg = sys.argv[1]
 np = importlib.import_module(pkg)
@@ -8,22 +8,29 @@ np = importlib.import_module(pkg)
 
 LAPTOP_MAX = 83361790
 
-size = LAPTOP_MAX
-data = np.random.random((size,))
+DELAY_MAX = 210000000
 
-#@cupy.fuse(kernel_name='func')
-def func(arg):
-    return np.sin(arg) ** 2 + np.cos(arg) ** 2
+size = DELAY_MAX
+data = np.random.random((size,))
 
 kern = np.ElementwiseKernel(
     'T x',
     'T z',
-    'z = sin(x) * sin(x) + cos(x) * cos(x)',
+    '''
+    T s = sin(x);
+    T c = cos(x);
+    z = s * s + c * c
+    ''',
     'kern1234'
 )
 
+def func():
+    kern(data)
+    np.cuda.Device().synchronize()
+
+
 #then = perf_counter()
-print(kern(data))
+print(min(timeit.repeat(func, repeat=1,number=1)))
 #now = perf_counter()
 
 #rint(f"time: {now-then}")
