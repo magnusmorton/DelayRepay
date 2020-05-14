@@ -93,8 +93,27 @@ def calc_shape(left, right, op=None):
         return left
 
 
-class NumpyEx(DelayArray):
+class Memoiser(type):
+    '''Metaclass implementing caching'''
+
+    def __new__(meta, *args, **kwargs):
+        cls = super(Memoiser, meta).__new__(meta, *args, **kwargs)
+        cls._cache = {}
+        return cls
+
+    def __call__(cls, *args):
+        if type(args[0]).__name__ == "ndarray":
+            key = id(args[0])
+        else:
+            key = hash(args)
+        if key not in cls._cache:
+            cls._cache[key] = super(Memoiser, cls).__call__(*args)
+        return cls._cache[key]
+
+
+class NumpyEx(DelayArray, metaclass=Memoiser):
     '''Numpy expression'''
+    expression_cache = {}
 
     def __init__(self):
         super().__init__()
@@ -103,6 +122,12 @@ class NumpyEx(DelayArray):
     @property
     def name(self):
         return f"var{self._id}"
+
+    def __hash__(self):
+        '''
+        Should work because of the Memoizer
+        '''
+        return id(self)
 
 
 class Funcable:
@@ -179,6 +204,7 @@ class BinaryNumpyEx(NumpyEx, Funcable):
         self.shape = calc_shape(left.shape, right.shape, func)
         self.dtype = calc_type(left, right)
 
+  
 
 class MMEx(NumpyEx, Funcable):
     # arg1: NumpyEx
@@ -210,21 +236,9 @@ class DotEx(NumpyEx, Funcable):
         self._inshape = left.shape
 
 
-class MemoMeta(type):
-    '''Metaclass implementing caching'''
-
-    def __new__(meta, *args, **kwargs):
-        cls = super(MemoMeta, meta).__new__(meta, *args, **kwargs)
-        cls._cache = {}
-        return cls
-
-    def __call__(cls, array):
-        if id(array) not in cls._cache:
-            cls._cache[id(array)] = super(MemoMeta, cls).__call__(array)
-        return cls._cache[id(array)]
 
 
-class NPArray(NumpyEx, DelayArray, metaclass=MemoMeta):
+class NPArray(NumpyEx, DelayArray):
     '''ndarray'''
 
     def __init__(self, array):
@@ -256,6 +270,9 @@ class Scalar(NumpyEx):
         super().__init__()
         self.val = val
         self.shape = (0,)
+
+    def __hash__(self):
+        return self.val
 
 
 class Visitor:
@@ -459,7 +476,9 @@ class Fragment(BaseFragment):
         self.name = name
         self._expr = expr
         self._inputs = inputs
-        self.dtype = np.float32
+        self.decls = {}
+        #self.dtype = np.float32
+        
 
     def ref(self) -> str:
         return self.name
@@ -545,6 +564,15 @@ class CupyEmitter(Visitor):
         self.ins = {}
         self.outs = []
         self.kernels = []
+        self.seen = {}
+
+    def visit(self, node, **kwargs):
+        if node in self.seen:
+            visited = self.seen[node]
+        else:
+            visited = super().visit(node, **kwargs)
+            self.seen[node] = visited
+        return visited
 
     def visit_BinaryNumpyEx(self,
                             node: BinaryNumpyEx,
@@ -554,7 +582,7 @@ class CupyEmitter(Visitor):
         right = self.visit(node.right, callshape=node.shape)
         name = node.name
         expr = f"{left.expr()} {op} {right.expr()}"
-        
+
         # stmts = left.stmts + right.stmts + [stmt]
         if callshape is None or callshape != node.shape:
             kern: Fragment = Kernel(name,
