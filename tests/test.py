@@ -1,6 +1,6 @@
 '''Test simple cl examples'''
 import unittest
-from delayarray import ones, full, NPArray
+from delayarray import ones, full, NPArray, array
 import numpy as np
 import numpy.testing as npt
 
@@ -138,10 +138,17 @@ class TestMeta(unittest.TestCase):
         self.assertIs(ar1, ar2)
 
     def test_no_memoize(self):
-        import cupy
         arr = full((3,), 5).astype(np.float32)
         arr2 = full((3,), 3).astype(np.float32)
         self.assertIsNot(arr, arr2)
+
+    def test_memo_ex(self):
+       arr = array([1, 2, 3])
+       ex1 = np.sin(arr)
+       print(id(ex1))
+       ex2 = np.sin(arr)
+       print(id(ex2))
+       self.assertIs(ex1, ex2)
 
     
 if __name__ == '__main__':

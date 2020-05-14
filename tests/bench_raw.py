@@ -24,13 +24,22 @@ kern = np.ElementwiseKernel(
     'kern1234'
 )
 
+
+kern = np.ElementwiseKernel(
+    'T x',
+    'T z',
+    '''
+    z = sin(x) * sin(x) + cos(x) * cos(x)
+    ''',
+    'kern12345'
+)
 def func():
     kern(data)
     np.cuda.Device().synchronize()
 
 
 #then = perf_counter()
-print(min(timeit.repeat(func, repeat=1,number=1)))
+print(min(timeit.repeat(func, repeat=100,number=1)))
 #now = perf_counter()
 
 #rint(f"time: {now-then}")
