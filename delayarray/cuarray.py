@@ -73,6 +73,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def get(self):
         return self.__array__().get()
 
+    def run(self):
+        self.__array__()
+
 
 def calc_shape(left, right, op=None):
     if left == (0,):
@@ -270,7 +273,7 @@ class Scalar(NumpyEx):
         self.shape = (0,)
 
     def __hash__(self):
-        return self.val
+        return hash(self.val)
 
 
 class Visitor:
@@ -647,7 +650,8 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
     for kern in kerns:
         compiled = kern.to_kern()
         inputs = [results[key] if isinstance(value, Kernel) else value for key, value in kern.kernel_args.items()]
-                
+
+
         ret = compiled(*inputs)
         results[kern.ref()] = ret
-        return ret
+    return ret
