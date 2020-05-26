@@ -14,9 +14,14 @@ size = LAPTOP_MAX
 data = np.random.random((size,))
 
 def func():
-    print(np.sin(data) ** 2 + np.cos(data) ** 2)
-    # if np.__name__ == "cuda":
-    #     np.cuda.Device().synchronize()
+    res = np.sin(data) ** 2 + np.cos(data) ** 2
+    if np.__name__ == "delayarray":
+        res.get()
+        np.cuda.Device().synchronize()
+    elif np.__name__ == "cupy":
+        res.get()
+        np.cuda.Device().synchronize()
+
 
 
 print(min(timeit.repeat(func, repeat=100, number=1)))
