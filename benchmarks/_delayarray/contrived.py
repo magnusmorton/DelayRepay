@@ -1,4 +1,4 @@
-import delayarray as np
+import delayrepay as np
 from benchmarks.common import JACOBI_SIZE
 import numpy as num
 

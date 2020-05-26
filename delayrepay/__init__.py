@@ -1,12 +1,12 @@
 #from numpy import *
 from .cuarray import *
-import delayarray.random
+import delayrepay.random
 
 import cupy
-import delayarray.fft
+import delayrepay.fft
 
 cuda = cupy.cuda
 
-fft = delayarray.fft
+fft = delayrepay.fft
 
 pi = cupy.pi

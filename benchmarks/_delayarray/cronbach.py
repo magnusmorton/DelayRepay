@@ -7,8 +7,8 @@
 #setup: import numpy as np ; np.random.seed(0); N = 600 ; items = np.random.rand(N,N)
 #run: cronbach(items)
 
-from delayarray import zeros, diag, diagflat
-from delayarray.random import rand
+from delayrepay import zeros, diag, diagflat
+from delayrepay.random import rand
 import numpy as np
 
 def cronbach(itemscores):

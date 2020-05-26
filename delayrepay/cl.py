@@ -1,6 +1,6 @@
 import logging
-import delayarray.num as num
-import delayarray.kernels as kernels
+import delayrepay.num as num
+import delayrepay.kernels as kernels
 import pyopencl as cl
 import numpy as np
 

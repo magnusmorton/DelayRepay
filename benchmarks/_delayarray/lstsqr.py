@@ -8,8 +8,8 @@
 
 #pythran export lstsqr(float[], float[])
 
-from delayarray import zeros, diag, diagflat
-from delayarray.random import rand
+from delayrepay import zeros, diag, diagflat
+from delayrepay.random import rand
 import numpy as np
 
 def lstsqr(x, y):

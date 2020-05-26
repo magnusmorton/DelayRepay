@@ -6,8 +6,8 @@
 
 #pythran export harris(float64[][])
 
-from delayarray import zeros, diag, diagflat
-from delayarray.random import randn
+from delayrepay import zeros, diag, diagflat
+from delayrepay.random import randn
 import numpy as np
 
 def harris(I):

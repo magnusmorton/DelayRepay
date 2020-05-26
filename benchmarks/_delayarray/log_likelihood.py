@@ -4,8 +4,8 @@
 #setup: import numpy as np ; N = 100000 ; a = np.random.random(N); b = 0.1; c =1.1
 #run: log_likelihood(a, b, c)
 #from: http://arogozhnikov.github.io/2015/09/08/SpeedBenchmarks.html
-from delayarray import zeros, diag, diagflat
-from delayarray.random import random
+from delayrepay import zeros, diag, diagflat
+from delayrepay.random import random
 import numpy as np
 
 #pythran export log_likelihood(float64[], float64, float64)

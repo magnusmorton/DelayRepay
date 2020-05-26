@@ -5,8 +5,8 @@
 #run: grayscott(40, 0.16, 0.08, 0.04, 0.06)
 
 #pythran export grayscott(int, float, float, float, float)
-from delayarray import zeros, diag, diagflat
-from delayarray.random import random
+from delayrepay import zeros, diag, diagflat
+from delayrepay.random import random
 import numpy as np
 def grayscott(counts, Du, Dv, F, k):
     n = 300

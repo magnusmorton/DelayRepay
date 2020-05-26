@@ -6,8 +6,8 @@
 
 #pythran export hasting(float [], float, float, float, float, float, float, float)
 import numpy as np
-from delayarray import zeros, diag, diagflat, empty
-from delayarray.random import rand
+from delayrepay import zeros, diag, diagflat, empty
+from delayrepay.random import rand
 
 def hasting(y, t, a1, a2, b1, b2, d1, d2):
     yprime = empty((3,))

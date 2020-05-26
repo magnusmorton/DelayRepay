@@ -1,6 +1,6 @@
-from delayarray import zeros, diag, diagflat
+from delayrepay import zeros, diag, diagflat
 from numpy import dot
-import delayarray.random as npr
+import delayrepay.random as npr
 from benchmarks.common import JACOBI_SIZE
 def jacobi(A,b,N=25,x=None):
     """Solves the equation Ax=b via the Jacobi iterative method."""

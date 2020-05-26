@@ -1,6 +1,6 @@
 '''Test simple cl examples'''
 import unittest
-from delayarray import ones, full, NPArray, array
+from delayrepay import ones, full, NPArray, array
 import numpy as np
 import numpy.testing as npt
 

@@ -3,7 +3,7 @@
 from typing import Any
 import numpy as np
 import numpy.lib.mixins
-import delayarray.num as num
+import delayrepay.num as num
 from .cl import run_gpu
 
 
