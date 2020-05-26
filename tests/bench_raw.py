@@ -10,7 +10,7 @@ LAPTOP_MAX = 83361790
 
 DELAY_MAX = 210000000
 
-size = DELAY_MAX
+size = LAPTOP_MAX
 data = np.random.random((size,))
 
 kern = np.ElementwiseKernel(
@@ -19,20 +19,22 @@ kern = np.ElementwiseKernel(
     '''
     T s = sin(x);
     T c = cos(x);
-    z = s * s + c * c
+    T l = s * s;
+    T r = c * c;
+    z = l + r;
     ''',
     'kern1234'
 )
 
 
-kern = np.ElementwiseKernel(
-    'T x',
-    'T z',
-    '''
-    z = sin(x) * sin(x) + cos(x) * cos(x)
-    ''',
-    'kern12345'
-)
+# kern = np.ElementwiseKernel(
+#     'T x',
+#     'T z',
+#     '''
+#     z = sin(x) * sin(x) + cos(x) * cos(x)
+#     ''',
+#     'kern12345'
+# )
 def func():
     kern(data)
     np.cuda.Device().synchronize()
