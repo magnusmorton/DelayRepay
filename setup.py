@@ -14,7 +14,6 @@ setup(
     test_suite="tests",
     install_requires=[
         "numpy>=1.16",
-        "pyopencl>=2019.1",
-        "dataclasses"
+        "cupy-cuda92>=7.5.0"
     ]
 )
