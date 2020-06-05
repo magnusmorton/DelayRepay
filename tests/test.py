@@ -96,6 +96,9 @@ class TestVector(unittest.TestCase):
         test = self.np_arr @ self.np_arr2
         self.assertEqual(res, test)
 
+    def test_sum(self):
+        pass
+
 
 
 
