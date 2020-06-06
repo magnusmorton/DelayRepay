@@ -1,6 +1,6 @@
 '''Test simple cl examples'''
 import unittest
-from delayrepay import ones, full, NPArray, array
+from delayrepay import ones, full, NPArray, array, sum
 import numpy as np
 import numpy.testing as npt
 
@@ -97,8 +97,9 @@ class TestVector(unittest.TestCase):
         self.assertEqual(res, test)
 
     def test_sum(self):
-        pass
-
+        res = sum(self.arr)
+        test = np.sum(self.np_arr)
+        self.assertEqual(res, test)
 
 
 
