@@ -15,7 +15,7 @@ data = np.random.random((size,))
 
 def func():
     res = np.sin(data) ** 2 + np.cos(data) ** 2
-    if np.__name__ == "delayarray":
+    if np.__name__ == "delayrepay":
         res.get()
         np.cuda.Device().synchronize()
     elif np.__name__ == "cupy":
