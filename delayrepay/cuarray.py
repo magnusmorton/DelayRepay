@@ -398,11 +398,12 @@ def diagflat(arr, k=0):
     return np.diagflat(np.asarray(arr, order='C'))
 
 
-@implements(np.sum)
-def sum(arr, axis=None, dtype=None, out=None, keepdims=None, initial=None, where=None):
-    print("BLAH")
-    return ReduceEx(np.add, arr)
+#@implements(np.sum)
+#def sum(arr, axis=None, dtype=None, out=None, keepdims=None, initial=None, where=None):
+#    print("BLAH")
+#    return ReduceEx(np.add, arr)
 
+sum = cast(cupy.sum)
 add = np.add
 multiply = np.multiply
 dot = np.dot
@@ -565,8 +566,21 @@ class ScalarFragment(BaseFragment):
         return str(self.val)
 
 
-class ReductionKernel(BaseFragment):
-    pass    
+class ReductionKernel(Kernel):
+
+    def to_kern(self):
+        kern = cupy.ReductionKernel(','.join(inargs),
+                                    'T out',
+                                    self.expr,
+                                    self.redex,
+                                    'out = a',
+                                    0,
+                                    self.name)
+        return kern
+
+
+
+
 
 def combine_inputs(*args: InputDict) -> InputDict:
     ret = {}
@@ -658,6 +672,10 @@ class CupyEmitter(Visitor):
     def visit_ReduceEx(self,
                        node: ReduceEx,
                        callshape: Tuple[int, int] = None) -> BaseFragment:
+        inner = self.visit(node.arg)
+        name = node.name
+        op = node.to_op()
+
         return NotImplemented
 
 
@@ -666,10 +684,10 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
     res = visitor.visit(ex)
     print(res)
     kerns = visitor.kernels
-    assert(len(kerns))
+    assert(len(kerns) ==1 )
     results: Dict[str, cupy.array] = {}
     for kern in kerns:
-        print(kern)
+        print(kern.stmts)
         compiled = kern.to_kern()
         inputs = [results[key] if isinstance(value, Kernel) else value for key, value in kern.kernel_args.items()]
 
