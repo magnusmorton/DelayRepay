@@ -16,7 +16,8 @@ OPS = {
 }
 
 FUNCS = {
-    'power': 'pow'
+    'power': 'pow',
+    'arctan2': 'atan2'
 }
 
 
@@ -141,6 +142,7 @@ class ReduceEx(NumpyEx, Funcable):
         super().__init__()
         self.func = func
         self.arg = arg
+        self.shape = (0,)
 
     # func: np.ufunc
     # arg: NumpyEx
@@ -396,15 +398,24 @@ def diagflat(arr, k=0):
     return np.diagflat(np.asarray(arr, order='C'))
 
 
+@implements(np.sum)
+def sum(arr, axis=None, dtype=None, out=None, keepdims=None, initial=None, where=None):
+    print("BLAH")
+    return ReduceEx(np.add, arr)
+
 add = np.add
 multiply = np.multiply
 dot = np.dot
 cos = np.cos
 sin = np.sin
 tan = np.tan
+arctan2 = np.arctan2
 subtract = np.subtract
 exp = np.exp
 power = np.power
+sqrt = np.sqrt
+
+
 
 # Ones and zeros
 empty = cast(np.empty)
@@ -554,6 +565,9 @@ class ScalarFragment(BaseFragment):
         return str(self.val)
 
 
+class ReductionKernel(BaseFragment):
+    pass    
+
 def combine_inputs(*args: InputDict) -> InputDict:
     ret = {}
     for arg in args:
@@ -584,6 +598,7 @@ class CupyEmitter(Visitor):
         return kern
 
     def visit(self, node, **kwargs):
+        print(type(node))
         if node in self.seen:
             visited = self.seen[node]
         else:
@@ -640,14 +655,21 @@ class CupyEmitter(Visitor):
                      callshape: Tuple[int, int] = None) -> BaseFragment:
         return ScalarFragment(node)
 
+    def visit_ReduceEx(self,
+                       node: ReduceEx,
+                       callshape: Tuple[int, int] = None) -> BaseFragment:
+        return NotImplemented
+
 
 def run_gpu(ex: NumpyEx) -> cupy.array:
     visitor = CupyEmitter()
-    visitor.visit(ex)
+    res = visitor.visit(ex)
+    print(res)
     kerns = visitor.kernels
     assert(len(kerns))
     results: Dict[str, cupy.array] = {}
     for kern in kerns:
+        print(kern)
         compiled = kern.to_kern()
         inputs = [results[key] if isinstance(value, Kernel) else value for key, value in kern.kernel_args.items()]
 

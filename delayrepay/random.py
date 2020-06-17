@@ -5,3 +5,5 @@ from .cuarray import cast
 rand = cast(cupy.random.rand)
 randn = cast(cupy.random.randn)
 random = cast(cupy.random.random)
+seed = cupy.random.seed
+randint = cast(cupy.random.randint)

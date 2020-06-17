@@ -64,6 +64,7 @@ class TestElwise(unittest.TestCase):
         npt.assert_array_almost_equal(res.get(), resn)
 
 
+
 class TestVector(unittest.TestCase):
     # pylint: disable=C
 
@@ -99,8 +100,13 @@ class TestVector(unittest.TestCase):
     def test_sum(self):
         res = sum(self.arr)
         test = np.sum(self.np_arr)
+        print(res)
         self.assertEqual(res, test)
 
+    def test_atan2(self):
+        res = np.arctan2(self.arr, self.arr2)
+        test = np.arctan2(self.np_arr, self.np_arr2)
+        npt.assert_array_almost_equal(res.get(), test)
 
 
 class TestMatrix(unittest.TestCase):
