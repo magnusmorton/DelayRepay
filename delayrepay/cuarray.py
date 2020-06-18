@@ -116,10 +116,12 @@ class Memoiser(type):
 
 
 class NumpyEx(DelayArray, metaclass=Memoiser):
+    children : List['NumpyEx']
     '''Numpy expression'''
-    def __init__(self):
+    def __init__(self, children: List['NumpyEx']=[]):
         super().__init__()
         self.dtype = None
+        self.children = children
     
     @property
     def name(self):
@@ -131,7 +133,6 @@ class NumpyEx(DelayArray, metaclass=Memoiser):
         '''
         return id(self)
 
-
 class Funcable:
     def to_op(self):
         return OPS[self.func.__name__]
@@ -139,9 +140,8 @@ class Funcable:
 
 class ReduceEx(NumpyEx, Funcable):
     def __init__(self, func, arg):
-        super().__init__()
+        super().__init__(children=[arg])
         self.func = func
-        self.arg = arg
         self.shape = (0,)
 
     # func: np.ufunc
@@ -151,26 +151,23 @@ class ReduceEx(NumpyEx, Funcable):
 class UnaryFuncEx(NumpyEx, Funcable):
 
     def __init__(self, func, arg):
-        super().__init__()
-        self.arg = arg
+        super().__init__(children=[arg])
         self.func = func
         self.shape = arg.shape
         self.dtype = arg.dtype
 
 
+
 class BinaryFuncEx(NumpyEx):
 
     def __init__(self, func, left, right):
-        super().__init__()
-        self.left = left
-        self.right = right
+        super().__init__(children=[left,right])
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
         self.dtype = calc_type(left, right)
         
     def to_op(self):
         return FUNCS[self.func.__name__]
-
 
 def pow_ex(func, left, right):
     if not isinstance(right.val, int):
@@ -195,14 +192,9 @@ def create_ex(func, args):
 
 class BinaryNumpyEx(NumpyEx, Funcable):
     '''Binary numpy expression'''
-    # left: NumpyEx
-    # right: NumpyEx
-    # func: np.ufunc
 
     def __init__(self, func, left, right):
-        super().__init__()
-        self.left = left
-        self.right = right
+        super().__init__(children=[left,right])
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
         self.dtype = calc_type(left, right)
@@ -588,6 +580,23 @@ def combine_inputs(*args: InputDict) -> InputDict:
         ret.update(arg)
     return ret
 
+class Fuser(Visitor):
+    def __init__(self):
+        super().__init__()
+        self.seen = {}
+    
+    def visit(self, node, **kwargs) -> List[NumpyEx]:
+        if isinstance(node, list):
+            children = self.list_visit(node)
+        else:
+            children = self.list_visit(node.children)
+        for child in children:
+            if child != node.shape:
+                print("foo")
+
+        print(type(node))
+
+        return node.shape
 
 class CupyEmitter(Visitor):
 
@@ -612,7 +621,6 @@ class CupyEmitter(Visitor):
         return kern
 
     def visit(self, node, **kwargs):
-        print(type(node))
         if node in self.seen:
             visited = self.seen[node]
         else:
@@ -624,8 +632,8 @@ class CupyEmitter(Visitor):
                             node: BinaryNumpyEx,
                             callshape: Tuple[int, int] = None) -> BaseFragment:
         op = node.to_op()
-        left = self.visit(node.left, callshape=node.shape)
-        right = self.visit(node.right, callshape=node.shape)
+        left = self.visit(node.children[0], callshape=node.shape)
+        right = self.visit(node.children[1], callshape=node.shape)
         name = node.name
         decl = f"T {name} = {left.ref()} {op} {right.ref()}"
         stmts = left.stmts + right.stmts + [decl]
@@ -638,7 +646,7 @@ class CupyEmitter(Visitor):
     def visit_UnaryFuncEx(self,
                           node: UnaryFuncEx,
                           callshape: Tuple[int, int] = None) -> BaseFragment:
-        inner = self.visit(node.arg)
+        inner = self.visit(node.children[0])
         name = node.name
         decls = inner.stmts + [f"T {name} = {node.func.__name__}({inner.ref()})"]
         return self._helper(name, decls, inner.inputs, callshape, node.shape)
@@ -647,8 +655,8 @@ class CupyEmitter(Visitor):
                            node: BinaryFuncEx,
                            callshape: Tuple[int, int] = None) -> BaseFragment:
         op = node.to_op()
-        left = self.visit(node.left, callshape=node.shape)
-        right = self.visit(node.right, callshape=node.shape)
+        left = self.visit(node.children[0], callshape=node.shape)
+        right = self.visit(node.children[1], callshape=node.shape)
         name = node.name
         decl = f"T {name} = {op}({left.expr()}, {right.expr()})"
         stmts = left.stmts + right.stmts + [decl]
@@ -672,7 +680,7 @@ class CupyEmitter(Visitor):
     def visit_ReduceEx(self,
                        node: ReduceEx,
                        callshape: Tuple[int, int] = None) -> BaseFragment:
-        inner = self.visit(node.arg)
+        inner = self.visit(node.children[0])
         name = node.name
         op = node.to_op()
 
@@ -680,14 +688,14 @@ class CupyEmitter(Visitor):
 
 
 def run_gpu(ex: NumpyEx) -> cupy.array:
+    fuser = Fuser()
+    fuser.visit(ex)
     visitor = CupyEmitter()
     res = visitor.visit(ex)
-    print(res)
     kerns = visitor.kernels
     assert(len(kerns) ==1 )
     results: Dict[str, cupy.array] = {}
     for kern in kerns:
-        print(kern.stmts)
         compiled = kern.to_kern()
         inputs = [results[key] if isinstance(value, Kernel) else value for key, value in kern.kernel_args.items()]
 
