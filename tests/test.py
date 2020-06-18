@@ -16,7 +16,6 @@ class TestElwise(unittest.TestCase):
 
     def test_scalar_add(self):
         res = self.arr + 1
-        print(res)
         npt.assert_array_almost_equal(res.get(), self.np_arr + 1)
 
     def test_scalar_mul(self):
