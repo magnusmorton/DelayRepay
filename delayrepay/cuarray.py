@@ -5,7 +5,7 @@ import cupy  # type: ignore
 import numpy as np  # type: ignore
 import numpy.lib.mixins  # type: ignore
 
-
+Shape = Tuple[int,int]
 
 OPS = {
     'matmul': '@',
@@ -257,6 +257,15 @@ class NPArray(NumpyEx, DelayArray):
         self.dtype = cast_arr.dtype
         return self
 
+class NPRef(NumpyEx, DelayArray):
+    '''Only for when breaking dependency chains for fusion'''
+    
+    name:str
+    ref:NumpyEx
+
+    def __init__(self, node:NumpyEx):
+        name = node.name
+        ref = node
 
 class Scalar(NumpyEx):
     '''a scalar'''
@@ -585,16 +594,27 @@ class Fuser(Visitor):
         super().__init__()
         self.seen = {}
     
-    def visit(self, node, **kwargs) -> List[NumpyEx]:
-        if isinstance(node, list):
-            children = self.list_visit(node)
-        else:
-            children = self.list_visit(node.children)
-        for child in children:
-            if child != node.shape:
-                print("foo")
+    def fuse(self, node):
+        
+        self.splits = [node]
+        self.visit(node)
+        return self.splits
 
-        print(type(node))
+    def visit(self, node, **kwargs) -> Shape:
+        if isinstance(node, list):
+            return self.list_visit(node)
+        child_shapes = self.list_visit(node.children)
+        new = []
+        for child, shape in zip(node.children, child_shapes):
+            if shape != node.shape and shape != (0,):
+                print("foo")
+                new.append(NPRef(child))
+                self.splits.append(child)
+
+            else:
+                new.append(child)
+
+        node.children = new
 
         return node.shape
 
@@ -689,11 +709,13 @@ class CupyEmitter(Visitor):
 
 def run_gpu(ex: NumpyEx) -> cupy.array:
     fuser = Fuser()
-    fuser.visit(ex)
+    splits = fuser.fuse(ex)
     visitor = CupyEmitter()
-    res = visitor.visit(ex)
-    kerns = visitor.kernels
-    assert(len(kerns) ==1 )
+    kerns = []
+    for split in splits:
+        res = visitor.visit(ex)
+        kerns.extend(visitor.kernels)
+    assert(len(kerns) )
     results: Dict[str, cupy.array] = {}
     for kern in kerns:
         compiled = kern.to_kern()
