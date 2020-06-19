@@ -1,6 +1,6 @@
 '''Delay array and related stuff'''
 
-from typing import Any, List, Dict, Tuple, Optional
+from typing import Any, List, Dict, Tuple, Optional, Union
 import cupy  # type: ignore
 import numpy as np  # type: ignore
 import numpy.lib.mixins  # type: ignore
@@ -178,6 +178,7 @@ def pow_ex(func, left, right):
         ex = BinaryNumpyEx(multiply, ex, left)
 
     return ex
+
 
 
 def create_ex(func, args):
@@ -532,10 +533,10 @@ class Kernel(Fragment):
 
 class InputFragment(BaseFragment):
 
-    def __init__(self, arr: NPArray) -> None:
+    def __init__(self, arr: Union[NPArray, NPRef]) -> None:
         super().__init__()
         self.name = arr.name
-        self._inputs = {self.name: arr.array}
+        self._inputs = {self.name: arr}
 
     def ref(self) -> str:
         return f"{self.name}"
@@ -567,7 +568,7 @@ class ScalarFragment(BaseFragment):
         return str(self.val)
 
 
-class ReductionKernel(Kernel):
+class ReductionKernel(Fragment):
 
     def to_kern(self):
         kern = cupy.ReductionKernel(','.join(inargs),
@@ -629,15 +630,9 @@ class CupyEmitter(Visitor):
 
     # TODO: rename
     def _helper(self, name, stmts, inputs, callshape, node_shape):
-        if callshape is None or callshape != node_shape:
-            kern: Fragment = Kernel(name,
-                                    stmts,
-                                    inputs)
-            self.kernels.append(kern)
-        else:
-            kern = Fragment(name,
-                            stmts,
-                            inputs)
+        kern = Fragment(name,
+                        stmts,
+                        inputs)
         return kern
 
     def visit(self, node, **kwargs):
@@ -678,7 +673,7 @@ class CupyEmitter(Visitor):
         left = self.visit(node.children[0], callshape=node.shape)
         right = self.visit(node.children[1], callshape=node.shape)
         name = node.name
-        decl = f"T {name} = {op}({left.expr()}, {right.expr()})"
+        decl = f"T {name} = {op}({left.ref()}, {right.ref()})"
         stmts = left.stmts + right.stmts + [decl]
         
         return self._helper(name,
@@ -714,14 +709,11 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
     kerns = []
     for split in splits:
         res = visitor.visit(ex)
-        kerns.extend(visitor.kernels)
-    assert(len(kerns) )
-    results: Dict[str, cupy.array] = {}
+        kerns.append(res)
+    assert(len(kerns))
     for kern in kerns:
         compiled = kern.to_kern()
-        inputs = [results[key] if isinstance(value, Kernel) else value for key, value in kern.kernel_args.items()]
-
-
+        inputs = [value.array for key, value in kern.kernel_args.items()]
         ret = compiled(*inputs)
-        results[kern.ref()] = ret
+        kern.array = ret
     return ret
