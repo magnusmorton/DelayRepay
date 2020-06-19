@@ -517,19 +517,6 @@ class Fragment(BaseFragment):
         return kern
 
 
-class Kernel(Fragment):
-
-    def __init__(self, *args, **kwargs):
-
-        super().__init__(*args, **kwargs)
-
-    @property
-    def inputs(self) -> InputDict:
-        return {self.ref(): self}
-
-    def expr(self) -> str:
-        return self.name
-
 
 class InputFragment(BaseFragment):
 
