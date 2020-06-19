@@ -588,7 +588,7 @@ class Fuser(Visitor):
         self.visit(node)
         return self.splits
 
-    def visit(self, node, **kwargs) -> Shape:
+    def visit(self, node) -> Shape:
         if isinstance(node, list):
             return self.list_visit(node)
         child_shapes = self.list_visit(node.children)
@@ -615,73 +615,51 @@ class CupyEmitter(Visitor):
         self.kernels = []
         self.seen = {}
 
-    # TODO: rename
-    def _helper(self, name, stmts, inputs, callshape, node_shape):
-        kern = Fragment(name,
-                        stmts,
-                        inputs)
-        return kern
-
-    def visit(self, node, **kwargs):
+    def visit(self, node):
         if node in self.seen:
             visited = self.seen[node]
         else:
-            visited = super().visit(node, **kwargs)
+            visited = super().visit(node)
             self.seen[node] = visited
         return visited
 
     def visit_BinaryNumpyEx(self,
-                            node: BinaryNumpyEx,
-                            callshape: Tuple[int, int] = None) -> BaseFragment:
+                            node: BinaryNumpyEx) -> BaseFragment:
         op = node.to_op()
-        left = self.visit(node.children[0], callshape=node.shape)
-        right = self.visit(node.children[1], callshape=node.shape)
+        left = self.visit(node.children[0])
+        right = self.visit(node.children[1])
         name = node.name
         decl = f"T {name} = {left.ref()} {op} {right.ref()}"
         stmts = left.stmts + right.stmts + [decl]
-        return self._helper(name,
-                            stmts,
-                            combine_inputs(left.inputs, right.inputs),
-                            callshape,
-                            node.shape)
+        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs))
 
     def visit_UnaryFuncEx(self,
-                          node: UnaryFuncEx,
-                          callshape: Tuple[int, int] = None) -> BaseFragment:
+                          node: UnaryFuncEx) -> BaseFragment:
         inner = self.visit(node.children[0])
         name = node.name
         decls = inner.stmts + [f"T {name} = {node.func.__name__}({inner.ref()})"]
-        return self._helper(name, decls, inner.inputs, callshape, node.shape)
+        return Fragment(name, decls, inner.inputs)
 
     def visit_BinaryFuncEx(self,
-                           node: BinaryFuncEx,
-                           callshape: Tuple[int, int] = None) -> BaseFragment:
+                           node: BinaryFuncEx) -> BaseFragment:
         op = node.to_op()
-        left = self.visit(node.children[0], callshape=node.shape)
-        right = self.visit(node.children[1], callshape=node.shape)
+        left = self.visit(node.children[0])
+        right = self.visit(node.children[1])
         name = node.name
         decl = f"T {name} = {op}({left.ref()}, {right.ref()})"
         stmts = left.stmts + right.stmts + [decl]
-        
-        return self._helper(name,
-                            stmts,
-                            combine_inputs(left.inputs, right.inputs),
-                            callshape,
-                            node.shape)
+        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs))
     
     def visit_NPArray(self,
-                      node: NPArray,
-                      callshape: Tuple[int, int] = None) -> BaseFragment:
+                      node: NPArray) -> BaseFragment:
         return InputFragment(node)
 
     def visit_Scalar(self,
-                     node: Scalar,
-                     callshape: Tuple[int, int] = None) -> BaseFragment:
+                     node: Scalar) -> BaseFragment:
         return ScalarFragment(node)
 
     def visit_ReduceEx(self,
-                       node: ReduceEx,
-                       callshape: Tuple[int, int] = None) -> BaseFragment:
+                       node: ReduceEx) -> BaseFragment:
         inner = self.visit(node.children[0])
         name = node.name
         op = node.to_op()
