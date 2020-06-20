@@ -17,9 +17,23 @@ OPS = {
 
 FUNCS = {
     'power': 'pow',
-    'arctan2': 'atan2'
+    'arctan2': 'atan2',
+    'absolute': 'abs',
+    'sin':'sin',
+    'cos':'cos',
+    'tan':'tan',
+    'sqrt':'sqrt'
 }
 
+
+def cast(func):
+    '''cast to Delay array decorator'''
+    def wrapper(*args, **kwargs):
+        arr = func(*args, **kwargs)
+        if not isinstance(arr, DelayArray):
+            arr = NPArray(arr)
+        return arr
+    return wrapper
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     _id: int = 0
@@ -87,6 +101,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         arr[key] = item
         return NPArray(arr)
 
+    @cast
     def __getitem__(self, key):
         return self.__array__()[key]
 
@@ -183,6 +198,8 @@ class UnaryFuncEx(NumpyEx, Funcable):
         self.shape = arg.shape
         self.dtype = arg.dtype
 
+    def to_op(self):
+        return FUNCS[self.func.__name__]
 
 
 class BinaryFuncEx(NumpyEx):
@@ -209,7 +226,6 @@ def pow_ex(func, left, right):
 
 
 def create_ex(func, args):
-    print(f"createex called: {func.__name__}")
     if func.__name__ in OPS:
         return BinaryNumpyEx(func, *args)
     if func.__name__ == 'square':
@@ -358,14 +374,6 @@ def is_matrix_vector(left, right):
     return len(left) > 1 and len(right) == 1
 
 
-def cast(func):
-    '''cast to Delay array decorator'''
-    def wrapper(*args, **kwargs):
-        arr = func(*args, **kwargs)
-        if not isinstance(arr, DelayArray):
-            arr = NPArray(arr)
-        return arr
-    return wrapper
 
 
 # def calc_type(func, type1, type2):
@@ -404,7 +412,6 @@ def arg_to_numpy_ex(arg: Any) -> NumpyEx:
     elif isinstance(arg, Number):
         return Scalar(arg)
     else:
-        print(type(arg))
         raise NotImplementedError
 
 
@@ -471,7 +478,7 @@ exp = np.exp
 power = np.power
 sqrt = np.sqrt
 square = np.square
-
+abs = np.abs
 newaxis = cupy.newaxis
 
 #dtypes etc.
@@ -694,7 +701,7 @@ class CupyEmitter(Visitor):
                           node: UnaryFuncEx) -> BaseFragment:
         inner = self.visit(node.children[0])
         name = node.name
-        decls = inner.stmts + [f"T {name} = {node.func.__name__}({inner.ref()})"]
+        decls = inner.stmts + [f"T {name} = {node.to_op()}({inner.ref()})"]
         return Fragment(name, decls, inner.inputs)
 
     def visit_BinaryFuncEx(self,
