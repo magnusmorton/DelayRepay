@@ -82,6 +82,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             
     def __setitem__(self, key, item):
         arr = self.__array__()
+        if isinstance(item, DelayArray):
+            item = item.__array__()
+        print(item)
         arr[key] = item
         return NPArray(arr)
 
@@ -275,7 +278,10 @@ class NPArray(NumpyEx, DelayArray):
         return id(self.array)
 
     def __eq__(self, other):
-        return self.array is other.array
+        try:
+            return self.array is other.array
+        except AttributeError:
+            return False
 
     def astype(self, *args, **kwargs):
         old = self.array
@@ -487,31 +493,31 @@ full_like = cast(cupy.full_like)
 
 # From existing data
 
-array = cast(np.array)
-asarray = cast(np.asarray)
-asanyarray = cast(np.asanyarray)
-ascontiguousarray = cast(np.ascontiguousarray)
-asmatrix = cast(np.asmatrix)
-copy = cast(np.copy)
-frombuffer = cast(np.frombuffer)
-fromfile = cast(np.fromfile)
-fromfunction = cast(np.fromfunction)
-fromiter = cast(np.fromiter)
-fromstring = cast(np.fromstring)
-loadtxt = cast(np.loadtxt)
+array = cast(cupy.array)
+asarray = cast(cupy.asarray)
+asanyarray = cast(cupy.asanyarray)
+ascontiguousarray = cast(cupy.ascontiguousarray)
+asmatrix = cast(cupy.asmatrix)
+copy = cast(cupy.copy)
+frombuffer = cast(cupy.frombuffer)
+fromfile = cast(cupy.fromfile)
+fromfunction = cast(cupy.fromfunction)
+fromiter = cast(cupy.fromiter)
+fromstring = cast(cupy.fromstring)
+loadtxt = cast(cupy.loadtxt)
 
 # Numerical ranges
-arange = cast(np.arange)
-linspace = cast(np.linspace)
-logspace = cast(np.logspace)
-geomspace = cast(np.geomspace)
+arange = cast(cupy.arange)
+linspace = cast(cupy.linspace)
+logspace = cast(cupy.logspace)
+geomspace = cast(cupy.geomspace)
 
 
 # Building matrices
-tri = cast(np.tri)
-tril = cast(np.tril)
-triu = cast(np.triu)
-vander = cast(np.vander)
+tri = cast(cupy.tri)
+tril = cast(cupy.tril)
+triu = cast(cupy.triu)
+vander = cast(cupy.vander)
 
 InputDict = Dict[str, 'BaseFragment']
 
