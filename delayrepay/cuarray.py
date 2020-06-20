@@ -476,6 +476,7 @@ newaxis = cupy.newaxis
 
 #dtypes etc.
 double = np.double
+float32 = np.float32
 
 # Ones and zeros
 empty = cast(cupy.empty)
