@@ -448,6 +448,10 @@ def transpose(arr, *args, **kwargs):
     return cupy.transpose(arr.__array__(), *args, **kwargs)
 
 
+@implements(np.roll)
+@cast
+def roll(arr, *args, **kwargs):
+    return cupy.roll(arr.__array__(), *args, **kwargs)
 
 #sum = cast(cupy.sum)
 add = np.add
@@ -469,16 +473,16 @@ newaxis = cupy.newaxis
 double = np.double
 
 # Ones and zeros
-empty = cast(np.empty)
-empty_like = cast(np.empty_like)
-eye = cast(np.eye)
-identity = cast(np.identity)
+empty = cast(cupy.empty)
+empty_like = cast(cupy.empty_like)
+eye = cast(cupy.eye)
+identity = cast(cupy.identity)
 ones = cast(cupy.ones)
-ones_like = cast(np.ones_like)
-zeros = cast(np.zeros)
-zeros_like = cast(np.zeros_like)
+ones_like = cast(cupy.ones_like)
+zeros = cast(cupy.zeros)
+zeros_like = cast(cupy.zeros_like)
 full = cast(cupy.full)
-full_like = cast(np.full_like)
+full_like = cast(cupy.full_like)
 
 
 # From existing data
