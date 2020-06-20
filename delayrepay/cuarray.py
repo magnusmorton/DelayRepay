@@ -77,6 +77,31 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def run(self):
         self.__array__()
 
+    def reshape(self, *args, **kwargs):
+        return NPArray(self.__array__().reshape(*args, **kwargs))
+            
+    def __setitem__(self, key, item):
+        arr = self.__array__()
+        arr[key] = item
+        return NPArray(arr)
+
+    def __getitem__(self, key):
+        return self.__array__()[key]
+
+    def var(self, *args, **kwargs):
+        return np.var(self, *args, **kwargs)
+
+    def sum(self, *args, **kwargs):
+        return np.sum(self, *args, **kwargs)
+
+    def __len__(self):
+        return self.shape[0]
+
+    @property
+    def T(self):
+        if len(self.shape) == 1:
+            return self
+        return np.transpose(self)
 
 def calc_shape(left, right, op=None):
     if left == (0,):
@@ -182,8 +207,11 @@ def pow_ex(func, left, right):
 
 
 def create_ex(func, args):
+    print(f"createex called: {func.__name__}")
     if func.__name__ in OPS:
         return BinaryNumpyEx(func, *args)
+    if func.__name__ == 'square':
+        return BinaryNumpyEx(multiply, args[0], args[0])
     if len(args) == 1:
         return UnaryFuncEx(func, *args)
     if func.__name__ == 'power':
@@ -371,6 +399,7 @@ def arg_to_numpy_ex(arg: Any) -> NumpyEx:
     elif isinstance(arg, Number):
         return Scalar(arg)
     else:
+        print(type(arg))
         raise NotImplementedError
 
 
@@ -405,7 +434,22 @@ def diagflat(arr, k=0):
 #    print("BLAH")
 #    return ReduceEx(np.add, arr)
 
-sum = cast(cupy.sum)
+@implements(np.var)
+def var(arr, *args, **kwargs):
+    return cupy.var(arr.__array__(), *args, **kwargs)
+
+@implements(np.sum)
+def sum(arr, *args, **kwargs):
+    return cupy.sum(arr.__array__(), *args, **kwargs)
+
+@implements(np.transpose)
+@cast
+def transpose(arr, *args, **kwargs):
+    return cupy.transpose(arr.__array__(), *args, **kwargs)
+
+
+
+#sum = cast(cupy.sum)
 add = np.add
 multiply = np.multiply
 dot = np.dot
@@ -417,8 +461,12 @@ subtract = np.subtract
 exp = np.exp
 power = np.power
 sqrt = np.sqrt
+square = np.square
 
+newaxis = cupy.newaxis
 
+#dtypes etc.
+double = np.double
 
 # Ones and zeros
 empty = cast(np.empty)
