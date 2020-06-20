@@ -84,7 +84,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         arr = self.__array__()
         if isinstance(item, DelayArray):
             item = item.__array__()
-        print(item)
         arr[key] = item
         return NPArray(arr)
 
@@ -497,27 +496,27 @@ array = cast(cupy.array)
 asarray = cast(cupy.asarray)
 asanyarray = cast(cupy.asanyarray)
 ascontiguousarray = cast(cupy.ascontiguousarray)
-asmatrix = cast(cupy.asmatrix)
+asmatrix = cast(np.asmatrix)
 copy = cast(cupy.copy)
-frombuffer = cast(cupy.frombuffer)
-fromfile = cast(cupy.fromfile)
-fromfunction = cast(cupy.fromfunction)
-fromiter = cast(cupy.fromiter)
-fromstring = cast(cupy.fromstring)
-loadtxt = cast(cupy.loadtxt)
+frombuffer = cast(np.frombuffer)
+fromfile = cast(np.fromfile)
+fromfunction = cast(np.fromfunction)
+fromiter = cast(np.fromiter)
+fromstring = cast(np.fromstring)
+loadtxt = cast(np.loadtxt)
 
 # Numerical ranges
 arange = cast(cupy.arange)
 linspace = cast(cupy.linspace)
 logspace = cast(cupy.logspace)
-geomspace = cast(cupy.geomspace)
+geomspace = cast(np.geomspace)
 
 
 # Building matrices
 tri = cast(cupy.tri)
 tril = cast(cupy.tril)
 triu = cast(cupy.triu)
-vander = cast(cupy.vander)
+vander = cast(np.vander)
 
 InputDict = Dict[str, 'BaseFragment']
 
@@ -653,7 +652,6 @@ class Fuser(Visitor):
         new = []
         for child, shape in zip(node.children, child_shapes):
             if shape != node.shape and shape != (0,):
-                print("foo")
                 new.append(NPRef(child))
                 self.splits.append(child)
 
