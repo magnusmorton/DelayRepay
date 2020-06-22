@@ -26,7 +26,11 @@ FUNCS = {
     'log': 'log',
     # HACK
     'negative': '-',
-    'exp': 'exp'
+    'exp': 'exp',
+    'tanh': 'tanh',
+    'sinh': 'sinh',
+    'cosh': 'cosh'
+
 }
 
 
@@ -502,6 +506,9 @@ dot = np.dot
 cos = np.cos
 sin = np.sin
 tan = np.tan
+tanh = np.tanh
+sinh = np.sinh
+cosh = np.cosh
 arctan2 = np.arctan2
 subtract = np.subtract
 exp = np.exp
