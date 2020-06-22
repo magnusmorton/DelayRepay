@@ -22,7 +22,8 @@ FUNCS = {
     'sin':'sin',
     'cos':'cos',
     'tan':'tan',
-    'sqrt':'sqrt'
+    'sqrt':'sqrt',
+    'log': 'log'
 }
 
 
@@ -481,6 +482,7 @@ tan = np.tan
 arctan2 = np.arctan2
 subtract = np.subtract
 exp = np.exp
+log = np.log
 power = np.power
 sqrt = np.sqrt
 square = np.square
