@@ -23,7 +23,9 @@ FUNCS = {
     'cos':'cos',
     'tan':'tan',
     'sqrt':'sqrt',
-    'log': 'log'
+    'log': 'log',
+    # HACK
+    'negative': '-'
 }
 
 
