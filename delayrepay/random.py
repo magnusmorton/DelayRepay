@@ -7,3 +7,4 @@ randn = cast(cupy.random.randn)
 random = cast(cupy.random.random)
 seed = cupy.random.seed
 randint = cast(cupy.random.randint)
+choice = cast(cupy.random.choice)
