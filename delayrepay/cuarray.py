@@ -25,7 +25,8 @@ FUNCS = {
     'sqrt':'sqrt',
     'log': 'log',
     # HACK
-    'negative': '-'
+    'negative': '-',
+    'exp': 'exp'
 }
 
 
