@@ -310,12 +310,12 @@ class NPArray(NumpyEx, DelayArray):
 class NPRef(NumpyEx, DelayArray):
     '''Only for when breaking dependency chains for fusion'''
     
-    name:str
-    ref:NumpyEx
-
     def __init__(self, node:NumpyEx):
-        name = node.name
-        ref = node
+        self.ref = node
+
+    @property
+    def array(self):
+        return self.ref.array
 
 class Scalar(NumpyEx):
     '''a scalar'''
@@ -331,16 +331,16 @@ class Scalar(NumpyEx):
 
 class Visitor:
     '''Visitor ABC'''
-    def visit(self, node, **kwargs):
+    def visit(self, node) -> Any:
         """Visit a node."""
         if isinstance(node, list):
             visitor = self.list_visit
         else:
             method = 'visit_' + node.__class__.__name__
             visitor = getattr(self, method, self.default_visit)
-        return visitor(node, **kwargs)
+        return visitor(node)
 
-    def list_visit(self, lst):
+    def list_visit(self, lst, **kwargs):
         return [self.visit(node) for node in lst]
 
     def default_visit(self, node):
@@ -352,10 +352,10 @@ class NumpyVisitor(Visitor):
     def __init__(self):
         self.visits = 0
 
-    def visit(self, node, **kwargs):
+    def visit(self, node):
         """Visit a node."""
         self.visits += 1
-        return super(NumpyVisitor, self).visit(node, **kwargs)
+        return super(NumpyVisitor, self).visit(node)
 
     def visit_BinaryExpression(self, node):
         return node
@@ -716,6 +716,10 @@ class CupyEmitter(Visitor):
     
     def visit_NPArray(self,
                       node: NPArray) -> BaseFragment:
+        return InputFragment(node)
+
+    def visit_NPRef(self,
+                    node: NPRef) -> BaseFragment:
         return InputFragment(node)
 
     def visit_Scalar(self,
