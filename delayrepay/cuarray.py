@@ -411,7 +411,10 @@ def arg_to_numpy_ex(arg: Any) -> NumpyEx:
         return arg
     elif isinstance(arg, Number):
         return Scalar(arg)
+    elif isinstance(arg, cupy.core.core.ndarray) or isinstance(arg, np.ndarray):
+        return NPArray(arg)
     else:
+        print(type(arg))
         raise NotImplementedError
 
 
@@ -465,6 +468,9 @@ def transpose(arr, *args, **kwargs):
 def roll(arr, *args, **kwargs):
     return cupy.roll(arr.__array__(), *args, **kwargs)
 
+@implements(np.max)
+def max(arr, *args, **kwargs):
+    return cupy.max(arr.__array__(), *args, **kwargs)
 #sum = cast(cupy.sum)
 add = np.add
 multiply = np.multiply
