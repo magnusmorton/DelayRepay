@@ -314,8 +314,10 @@ class NPArray(NumpyEx, DelayArray):
 class NPRef(NumpyEx, DelayArray):
     '''Only for when breaking dependency chains for fusion'''
     
-    def __init__(self, node:NumpyEx):
+    def __init__(self, node:NumpyEx, shape:Shape):
         self.ref = node
+        self.children = []
+        self.shape = shape
 
     @property
     def array(self):
@@ -674,7 +676,7 @@ class Fuser(Visitor):
         new = []
         for child, shape in zip(node.children, child_shapes):
             if shape != node.shape and shape != (0,):
-                new.append(NPRef(child))
+                new.append(NPRef(child, node.shape))
                 self.splits.append(child)
 
             else:
