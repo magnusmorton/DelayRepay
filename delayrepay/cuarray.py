@@ -123,6 +123,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         if len(self.shape) == 1:
             return self
         return np.transpose(self)
+    
+    def repeat(self, *args, **kwargs):
+        return repeat(self, *args, **kwargs)
 
 def calc_shape(left, right, op=None):
     if left == (0,):
@@ -480,6 +483,18 @@ def max(arr, *args, **kwargs):
 @implements(np.average)
 def average(arr, *args, **kwargs):
     return cupy.average(arr.__array__(), *args, **kwargs)
+
+@implements(np.repeat)
+@cast
+def repeat(arr, *args, **kwargs):
+    return cupy.repeat(arr.__array__(), *args, **kwargs)
+
+
+@implements(np.cumsum)
+@cast
+def cumsum(arr, *args, **kwargs):
+    return cupy.cumsum(arr.__array__(), *args, **kwargs)
+
 #sum = cast(cupy.sum)
 add = np.add
 multiply = np.multiply
@@ -513,7 +528,7 @@ zeros_like = cast(cupy.zeros_like)
 full = cast(cupy.full)
 full_like = cast(cupy.full_like)
 
-
+tile = cast(cupy.tile)
 # From existing data
 
 array = cast(cupy.array)
