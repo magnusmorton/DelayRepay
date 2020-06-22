@@ -447,7 +447,6 @@ def diagflat(arr, k=0):
     # keep it simple for now
     return np.diagflat(np.asarray(arr, order='C'))
 
-
 #@implements(np.sum)
 #def sum(arr, axis=None, dtype=None, out=None, keepdims=None, initial=None, where=None):
 #    print("BLAH")
@@ -475,6 +474,10 @@ def roll(arr, *args, **kwargs):
 @implements(np.max)
 def max(arr, *args, **kwargs):
     return cupy.max(arr.__array__(), *args, **kwargs)
+
+@implements(np.average)
+def average(arr, *args, **kwargs):
+    return cupy.average(arr.__array__(), *args, **kwargs)
 #sum = cast(cupy.sum)
 add = np.add
 multiply = np.multiply
