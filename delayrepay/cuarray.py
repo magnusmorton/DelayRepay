@@ -522,6 +522,7 @@ newaxis = cupy.newaxis
 #dtypes etc.
 double = np.double
 float32 = np.float32
+uint32 = np.uint32
 
 # Ones and zeros
 empty = cast(cupy.empty)
@@ -771,7 +772,6 @@ class CupyEmitter(Visitor):
         op = node.to_op()
 
         return NotImplemented
-
 
 def run_gpu(ex: NumpyEx) -> cupy.array:
     fuser = Fuser()
