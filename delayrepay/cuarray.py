@@ -90,6 +90,12 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             return self._dot(args, kwargs)
         return HANDLED_FUNCTIONS[func](*args, **kwargs)
 
+    def __gt__(self, other):
+        return greater(self, other)
+
+    def __lt__(self, other):
+        return less(self, other)
+
     def dot(self, other, out=None):
         return np.dot(self, other)
 
@@ -104,13 +110,18 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             
     def __setitem__(self, key, item):
         arr = self.__array__()
+        if isinstance(key, DelayArray):
+            key = key.__array__()
         if isinstance(item, DelayArray):
             item = item.__array__()
+
         arr[key] = item
         return NPArray(arr)
 
     @cast
     def __getitem__(self, key):
+        if isinstance(key, DelayArray):
+            key = key.__array__()
         return self.__array__()[key]
 
     def var(self, *args, **kwargs):
@@ -499,6 +510,13 @@ def repeat(arr, *args, **kwargs):
 def cumsum(arr, *args, **kwargs):
     return cupy.cumsum(arr.__array__(), *args, **kwargs)
 
+@implements(np.greater)
+def greater(arr1, arr2, *args, **kwargs):
+    return cupy.greater(arr1.__array__(), arr2, *args, **kwargs)
+
+@implements(np.less)
+def less(arr1, arr2, *args, **kwargs):
+    return cupy.less(arr1.__array__(), arr2, *args, **kwargs)
 #sum = cast(cupy.sum)
 add = np.add
 multiply = np.multiply
@@ -536,7 +554,15 @@ zeros_like = cast(cupy.zeros_like)
 full = cast(cupy.full)
 full_like = cast(cupy.full_like)
 
-tile = cast(cupy.tile)
+@implements(np.tile)
+@cast
+def tile(arr, *args, **kwargs):
+
+    if isinstance(arr, DelayArray):
+        temp = np.array(arr.__array__().get())
+        print(type(temp))
+    return cupy.tile(temp, *args, **kwargs)
+
 # From existing data
 
 array = cast(cupy.array)
