@@ -44,12 +44,9 @@ def cast(func):
     return wrapper
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
-    _id: int = 0
     
     def __init__(self, *args, **kwargs):
         self._memo = None
-        self.name = f"var{DelayArray._id}"
-        DelayArray._id += 1
 
     def __repr__(self):
         return str(self.__array__())
@@ -181,8 +178,7 @@ class Memoiser(type):
 
 def reset():
     # hacks
-    print("resetting....")
-    DelayArray._id = 0
+
     Memoiser._cache = {}
 
 class NumpyEx(DelayArray, metaclass=Memoiser ):
@@ -269,7 +265,6 @@ class BinaryNumpyEx(NumpyEx, Funcable):
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
         self.dtype = calc_type(left, right)
-        print(f"binex name: {self.name}")
 
   
 
@@ -313,7 +308,6 @@ class NPArray(NumpyEx):
         self.array = array
         self.shape = array.shape
         self.dtype = array.dtype
-        print(f"arr name: {self.name}")
 
     def __hash__(self):
         return id(self.array)
@@ -337,10 +331,10 @@ class NPRef(NumpyEx):
     '''Only for when breaking dependency chains for fusion'''
     
     def __init__(self, node:NumpyEx, shape:Shape):
+        super().__init__()
         self.ref = node
         self.children = []
         self.shape = shape
-        print(f'ref name: {self.name}')
 
     @property
     def array(self):
@@ -658,10 +652,9 @@ class Fragment(BaseFragment):
 
 class InputFragment(BaseFragment):
 
-    def __init__(self, arr: Union[NPArray, NPRef]) -> None:
+    def __init__(self, name: str, arr: Union[NPArray, NPRef]) -> None:
         super().__init__()
-        self.name = arr.name
-        print(f"input frag: {self.name}")
+        self.name = name
         self._inputs = {self.name: arr}
         self.bindings.add(self.name)
 
@@ -736,7 +729,6 @@ class Fuser(Visitor):
         for child, shape in zip(node.children, child_shapes):
             if shape != node.shape and shape != (0,):
                 new.append(NPRef(child, node.shape))
-                print("split")
                 self.splits.append(child)
 
             else:
@@ -754,6 +746,7 @@ class CupyEmitter(Visitor):
         self.outs = []
         self.kernels = []
         self.seen = {}
+        self.count = 0
 
     def visit(self, node):
         if node in self.seen:
@@ -761,6 +754,7 @@ class CupyEmitter(Visitor):
         else:
             visited = super().visit(node)
             self.seen[node] = visited
+            self.count += 1
         return visited
 
     def visit_BinaryNumpyEx(self,
@@ -769,9 +763,8 @@ class CupyEmitter(Visitor):
         left = self.visit(node.children[0])
         right = self.visit(node.children[1])
         bindings = left.bindings.union(right.bindings)
-        name = node.name
+        name = f'binex{self.count}'
         decl = ""
-        print(bindings)
         if name not in bindings:
             decl = "T"
             bindings.add(name)
@@ -784,7 +777,7 @@ class CupyEmitter(Visitor):
                           node: UnaryFuncEx) -> BaseFragment:
         inner = self.visit(node.children[0])
         bindings = inner.bindings
-        name = node.name
+        name = f'unfunc{self.count}'
         decl = ""
         if name not in bindings:
             decl = "T"
@@ -798,7 +791,7 @@ class CupyEmitter(Visitor):
         left = self.visit(node.children[0])
         right = self.visit(node.children[1])
         bindings = left.bindings.union(right.bindings)
-        name = node.name
+        name = f'binfunc{self.count}'
         decl = ""
         if name not in bindings:
             decl = "T"
@@ -810,11 +803,11 @@ class CupyEmitter(Visitor):
     
     def visit_NPArray(self,
                       node: NPArray) -> BaseFragment:
-        return InputFragment(node)
+        return InputFragment(f'arr{self.count}', node)
 
     def visit_NPRef(self,
                     node: NPRef) -> BaseFragment:
-        return InputFragment(node)
+        return InputFragment(f'ref{self.count}', node)
 
     def visit_Scalar(self,
                      node: Scalar) -> BaseFragment:
@@ -838,9 +831,6 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
         kerns.append(res)
     assert(len(kerns))
     for kern in kerns:
-        print(kern.stmts)
-        print(kern.kernel_args.keys())
-        print(kern.inputs.keys())
         compiled = kern.to_kern()
         inputs = [value.array for key, value in kern.kernel_args.items()]
         ret = compiled(*inputs)
