@@ -48,7 +48,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     
     def __init__(self, *args, **kwargs):
         self._memo = None
-        self._id = DelayArray._id
+        self.name = f"var{DelayArray._id}"
         DelayArray._id += 1
 
     def __repr__(self):
@@ -73,9 +73,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def _dot_mm(self, args, kwargs):
         return MMEx(args[0], args[1])
 
-    @classmethod
-    def reset(cls):
-        cls._id = 0
 
     def _dot(self, args, kwargs):
         # scalar result dot
@@ -182,18 +179,19 @@ class Memoiser(type):
             cls._cache[key] = super(Memoiser, cls).__call__(*args)
         return cls._cache[key]
 
+def reset():
+    # hacks
+    print("resetting....")
+    DelayArray._id = 0
+    Memoiser._cache = {}
 
-class NumpyEx(DelayArray, metaclass=Memoiser):
+class NumpyEx(DelayArray, metaclass=Memoiser ):
     children : List['NumpyEx']
     '''Numpy expression'''
     def __init__(self, children: List['NumpyEx']=[]):
         super().__init__()
         self.dtype = None
         self.children = children
-    
-    @property
-    def name(self):
-        return f"var{self._id}"
 
     def __hash__(self):
         '''
@@ -271,6 +269,7 @@ class BinaryNumpyEx(NumpyEx, Funcable):
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
         self.dtype = calc_type(left, right)
+        print(f"binex name: {self.name}")
 
   
 
@@ -306,7 +305,7 @@ class DotEx(NumpyEx, Funcable):
 
 
 
-class NPArray(NumpyEx, DelayArray):
+class NPArray(NumpyEx):
     '''ndarray'''
 
     def __init__(self, array):
@@ -314,6 +313,7 @@ class NPArray(NumpyEx, DelayArray):
         self.array = array
         self.shape = array.shape
         self.dtype = array.dtype
+        print(f"arr name: {self.name}")
 
     def __hash__(self):
         return id(self.array)
@@ -333,13 +333,14 @@ class NPArray(NumpyEx, DelayArray):
         self.dtype = cast_arr.dtype
         return self
 
-class NPRef(NumpyEx, DelayArray):
+class NPRef(NumpyEx):
     '''Only for when breaking dependency chains for fusion'''
     
     def __init__(self, node:NumpyEx, shape:Shape):
         self.ref = node
         self.children = []
         self.shape = shape
+        print(f'ref name: {self.name}')
 
     @property
     def array(self):
@@ -660,7 +661,9 @@ class InputFragment(BaseFragment):
     def __init__(self, arr: Union[NPArray, NPRef]) -> None:
         super().__init__()
         self.name = arr.name
+        print(f"input frag: {self.name}")
         self._inputs = {self.name: arr}
+        self.bindings.add(self.name)
 
     def ref(self) -> str:
         return f"{self.name}"
@@ -733,6 +736,7 @@ class Fuser(Visitor):
         for child, shape in zip(node.children, child_shapes):
             if shape != node.shape and shape != (0,):
                 new.append(NPRef(child, node.shape))
+                print("split")
                 self.splits.append(child)
 
             else:
@@ -767,6 +771,7 @@ class CupyEmitter(Visitor):
         bindings = left.bindings.union(right.bindings)
         name = node.name
         decl = ""
+        print(bindings)
         if name not in bindings:
             decl = "T"
             bindings.add(name)
@@ -832,10 +837,10 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
         res = visitor.visit(ex)
         kerns.append(res)
     assert(len(kerns))
-    print(f'length of kerns: {len(kerns)}')
     for kern in kerns:
-        print(f'length of stmts: {len(kern.stmts)}')
         print(kern.stmts)
+        print(kern.kernel_args.keys())
+        print(kern.inputs.keys())
         compiled = kern.to_kern()
         inputs = [value.array for key, value in kern.kernel_args.items()]
         ret = compiled(*inputs)
