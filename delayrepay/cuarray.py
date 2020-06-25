@@ -1,6 +1,6 @@
 '''Delay array and related stuff'''
 
-from typing import Any, List, Dict, Tuple, Optional, Union
+from typing import Any, List, Dict, Tuple, Optional, Union, Set
 import cupy  # type: ignore
 import numpy as np  # type: ignore
 import numpy.lib.mixins  # type: ignore
@@ -72,6 +72,10 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def _dot_mm(self, args, kwargs):
         return MMEx(args[0], args[1])
+
+    @classmethod
+    def reset(cls):
+        cls._id = 0
 
     def _dot(self, args, kwargs):
         # scalar result dot
@@ -599,6 +603,7 @@ class BaseFragment:
         self.stmts = []
         self._expr = None
         self._inputs = {}
+        self.bindings = set()
         
     @property
     def inputs(self) -> InputDict:
@@ -620,10 +625,12 @@ class Fragment(BaseFragment):
     def __init__(self,
                  name: str,
                  stmts: List[str],
-                 inputs: InputDict) -> None:
+                 inputs: InputDict,
+                 bindings: Set[str]) -> None:
         self.name = name
         self.stmts = stmts
         self._inputs = inputs
+        self.bindings = bindings
         #self.dtype = np.float32
         
 
@@ -757,27 +764,44 @@ class CupyEmitter(Visitor):
         op = node.to_op()
         left = self.visit(node.children[0])
         right = self.visit(node.children[1])
+        bindings = left.bindings.union(right.bindings)
         name = node.name
-        decl = f"T {name} = {left.ref()} {op} {right.ref()}"
-        stmts = left.stmts + right.stmts + [decl]
-        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs))
+        decl = ""
+        if name not in bindings:
+            decl = "T"
+            bindings.add(name)
+        stmt = f"{decl} {name} = {left.ref()} {op} {right.ref()}"
+        stmts = left.stmts + right.stmts + [stmt]
+        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs),
+                bindings)
 
     def visit_UnaryFuncEx(self,
                           node: UnaryFuncEx) -> BaseFragment:
         inner = self.visit(node.children[0])
+        bindings = inner.bindings
         name = node.name
-        decls = inner.stmts + [f"T {name} = {node.to_op()}({inner.ref()})"]
-        return Fragment(name, decls, inner.inputs)
+        decl = ""
+        if name not in bindings:
+            decl = "T"
+            bindings.add(name)
+        stmts = inner.stmts + [f"{decl} {name} = {node.to_op()}({inner.ref()})"]
+        return Fragment(name, stmts, inner.inputs, bindings)
 
     def visit_BinaryFuncEx(self,
                            node: BinaryFuncEx) -> BaseFragment:
         op = node.to_op()
         left = self.visit(node.children[0])
         right = self.visit(node.children[1])
+        bindings = left.bindings.union(right.bindings)
         name = node.name
-        decl = f"T {name} = {op}({left.ref()}, {right.ref()})"
-        stmts = left.stmts + right.stmts + [decl]
-        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs))
+        decl = ""
+        if name not in bindings:
+            decl = "T"
+            bindings.add(name)
+        stmt = f"{decl} {name} = {op}({left.ref()}, {right.ref()})"
+        stmts = left.stmts + right.stmts + [stmt]
+        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs),
+                        bindings)
     
     def visit_NPArray(self,
                       node: NPArray) -> BaseFragment:
@@ -808,7 +832,10 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
         res = visitor.visit(ex)
         kerns.append(res)
     assert(len(kerns))
+    print(f'length of kerns: {len(kerns)}')
     for kern in kerns:
+        print(f'length of stmts: {len(kern.stmts)}')
+        print(kern.stmts)
         compiled = kern.to_kern()
         inputs = [value.array for key, value in kern.kernel_args.items()]
         ret = compiled(*inputs)
