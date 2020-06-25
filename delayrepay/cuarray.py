@@ -598,7 +598,6 @@ class BaseFragment:
         self.stmts = []
         self._expr = None
         self._inputs = {}
-        self.bindings = set()
         
     @property
     def inputs(self) -> InputDict:
@@ -620,12 +619,10 @@ class Fragment(BaseFragment):
     def __init__(self,
                  name: str,
                  stmts: List[str],
-                 inputs: InputDict,
-                 bindings: Set[str]) -> None:
+                 inputs: InputDict) -> None:
         self.name = name
         self.stmts = stmts
         self._inputs = inputs
-        self.bindings = bindings
         #self.dtype = np.float32
         
 
@@ -656,7 +653,6 @@ class InputFragment(BaseFragment):
         super().__init__()
         self.name = name
         self._inputs = {self.name: arr}
-        self.bindings.add(self.name)
 
     def ref(self) -> str:
         return f"{self.name}"
@@ -762,44 +758,28 @@ class CupyEmitter(Visitor):
         op = node.to_op()
         left = self.visit(node.children[0])
         right = self.visit(node.children[1])
-        bindings = left.bindings.union(right.bindings)
         name = f'binex{self.count}'
-        decl = ""
-        if name not in bindings:
-            decl = "T"
-            bindings.add(name)
-        stmt = f"{decl} {name} = {left.ref()} {op} {right.ref()}"
+        stmt = f"T {name} = {left.ref()} {op} {right.ref()}"
         stmts = left.stmts + right.stmts + [stmt]
-        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs),
-                bindings)
+        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs))
 
     def visit_UnaryFuncEx(self,
                           node: UnaryFuncEx) -> BaseFragment:
         inner = self.visit(node.children[0])
-        bindings = inner.bindings
         name = f'unfunc{self.count}'
-        decl = ""
-        if name not in bindings:
-            decl = "T"
-            bindings.add(name)
-        stmts = inner.stmts + [f"{decl} {name} = {node.to_op()}({inner.ref()})"]
-        return Fragment(name, stmts, inner.inputs, bindings)
+        stmts = inner.stmts + [f"T {name} = {node.to_op()}({inner.ref()})"]
+        return Fragment(name, stmts, inner.inputs)
 
     def visit_BinaryFuncEx(self,
                            node: BinaryFuncEx) -> BaseFragment:
         op = node.to_op()
         left = self.visit(node.children[0])
         right = self.visit(node.children[1])
-        bindings = left.bindings.union(right.bindings)
         name = f'binfunc{self.count}'
-        decl = ""
-        if name not in bindings:
-            decl = "T"
-            bindings.add(name)
-        stmt = f"{decl} {name} = {op}({left.ref()}, {right.ref()})"
+        stmt = f"T {name} = {op}({left.ref()}, {right.ref()})"
         stmts = left.stmts + right.stmts + [stmt]
-        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs),
-                        bindings)
+        return Fragment(name, stmts, combine_inputs(left.inputs,
+                        right.inputs))
     
     def visit_NPArray(self,
                       node: NPArray) -> BaseFragment:
