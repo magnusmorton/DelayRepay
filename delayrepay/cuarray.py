@@ -706,15 +706,24 @@ def combine_inputs(*args: InputDict) -> InputDict:
         ret.update(arg)
     return ret
 
+class PrettyPrinter(Visitor):
+    
+    def visit(self, node):
+        if isinstance(node, list):
+            return self.list_visit(node)
+        print(type(node).__name__)
+        self.visit(node.children)
+
 class Fuser(Visitor):
     def __init__(self):
         super().__init__()
         self.seen = {}
+        self.splits = []
     
     def fuse(self, node):
         
-        self.splits = [node]
         self.visit(node)
+        self.splits.append(node)
         return self.splits
 
     def visit(self, node) -> Shape:
@@ -726,7 +735,6 @@ class Fuser(Visitor):
             if shape != node.shape and shape != (0,):
                 new.append(NPRef(child, node.shape))
                 self.splits.append(child)
-
             else:
                 new.append(child)
 
