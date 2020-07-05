@@ -642,7 +642,8 @@ class Fragment(BaseFragment):
         kern = cupy.ElementwiseKernel(
             ",".join(inargs),
             f"T out",
-            f"{body};\nout = {self.name}"
+            f"{body};\nout = {self.name}",
+            f"delay_repay_{self.name}"
         )
         return kern
 
