@@ -163,10 +163,10 @@ def calc_shape(left, right, op=None):
 
 class Memoiser(type):
     '''Metaclass implementing caching'''
-
+    
     def __new__(meta, *args, **kwargs):
         cls = super(Memoiser, meta).__new__(meta, *args, **kwargs)
-        cls._cache = {}
+        meta._cache = {}
         return cls
 
     def __call__(cls, *args):
@@ -175,12 +175,13 @@ class Memoiser(type):
         else:
             key = hash(args)
         if key not in cls._cache:
-            cls._cache[key] = super(Memoiser, cls).__call__(*args)
+            Memoiser._cache[key] = super(Memoiser, cls).__call__(*args)
         return cls._cache[key]
 
 def reset():
     # hacks
-    NPArray._cache.clear()
+    Memoiser._cache.clear()
+
 
 class NumpyEx(DelayArray, metaclass=Memoiser):
     children : List['NumpyEx']
