@@ -53,9 +53,11 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def __array__(self):
         # return NumpyFunction(self.ex)()
-        if isinstance(self, NPArray):
+        try:
             return self.array
-        return run_gpu(self)
+        except AttributeError:
+            self.array = run_gpu(self)
+            return self.array
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if ufunc.__name__ == 'matmul':
@@ -114,13 +116,13 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             item = item.__array__()
 
         arr[key] = item
-        return NPArray(arr)
 
     @cast
     def __getitem__(self, key):
         if isinstance(key, DelayArray):
             key = key.__array__()
-        return self.__array__()[key]
+        arr = self.__array__()
+        return arr[key]
 
     def var(self, *args, **kwargs):
         return np.var(self, *args, **kwargs)
@@ -178,10 +180,9 @@ class Memoiser(type):
 
 def reset():
     # hacks
+    NPArray._cache.clear()
 
-    Memoiser._cache = {}
-
-class NumpyEx(DelayArray, metaclass=Memoiser ):
+class NumpyEx(DelayArray, metaclass=Memoiser):
     children : List['NumpyEx']
     '''Numpy expression'''
     def __init__(self, children: List['NumpyEx']=[]):
@@ -503,9 +504,8 @@ def average(arr, *args, **kwargs):
 def repeat(arr, *args, **kwargs):
     return cupy.repeat(arr.__array__(), *args, **kwargs)
 
-
-@implements(np.cumsum)
 @cast
+@implements(np.cumsum)
 def cumsum(arr, *args, **kwargs):
     return cupy.cumsum(arr.__array__(), *args, **kwargs)
 
