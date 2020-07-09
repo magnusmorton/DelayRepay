@@ -1,5 +1,6 @@
 '''Delay array and related stuff'''
 
+from numbers import Number
 from typing import Any, List, Dict, Tuple, Optional, Union, Set
 import cupy  # type: ignore
 import numpy as np  # type: ignore
@@ -33,6 +34,13 @@ FUNCS = {
 
 }
 
+ufunc_lookup = {
+    'matmul': cupy.matmul,
+    'add': cupy.add,
+    'multiply': cupy.multiply,
+    'subtract': cupy.subtract,
+    'true_divide': cupy.true_divide
+}
 
 def cast(func):
     '''cast to Delay array decorator'''
@@ -60,6 +68,14 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             return self.array
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        if len(inputs) > 1:
+            left = inputs[0]
+            right = inputs[1]
+            if not isinstance(left, Number) and not isinstance(right, Number):
+                if left.shape != right.shape:
+                    if left.shape != (0,) and right.shape != (0,):
+                        print(ufunc)
+                        return ufunc_lookup[ufunc.__name__](left.__array__(), right.__array__())
         if ufunc.__name__ == 'matmul':
             return self._dot(inputs, kwargs)
         # cls = func_to_numpy_ex(ufunc)
@@ -819,7 +835,7 @@ def run_gpu(ex: NumpyEx) -> cupy.array:
     for split in splits:
         res = visitor.visit(ex)
         kerns.append(res)
-    assert(len(kerns))
+    assert(len(kerns)<=1)
     for kern in kerns:
         compiled = kern.to_kern()
         inputs = [value.array for key, value in kern.kernel_args.items()]
