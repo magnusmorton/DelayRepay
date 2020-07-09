@@ -74,7 +74,6 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             if not isinstance(left, Number) and not isinstance(right, Number):
                 if left.shape != right.shape:
                     if left.shape != (0,) and right.shape != (0,):
-                        print(ufunc)
                         return ufunc_lookup[ufunc.__name__](left.__array__(), right.__array__())
         if ufunc.__name__ == 'matmul':
             return self._dot(inputs, kwargs)
@@ -828,14 +827,8 @@ class CupyEmitter(Visitor):
         return NotImplemented
 
 def run_gpu(ex: NumpyEx) -> cupy.array:
-    fuser = Fuser()
-    splits = fuser.fuse(ex)
     visitor = CupyEmitter()
-    kerns = []
-    for split in splits:
-        res = visitor.visit(ex)
-        kerns.append(res)
-    assert(len(kerns)<=1)
+    kerns = [visitor.visit(ex)]
     for kern in kerns:
         compiled = kern.to_kern()
         inputs = [value.array for key, value in kern.kernel_args.items()]
