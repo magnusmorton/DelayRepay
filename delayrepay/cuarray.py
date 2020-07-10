@@ -87,7 +87,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def _dot_mm(self, args, kwargs):
         return MMEx(args[0], args[1])
 
-
+    @cast
     def _dot(self, args, kwargs):
         # scalar result dot
         args = [arg_to_numpy_ex(arg) for arg in args]
@@ -511,6 +511,10 @@ def roll(arr, *args, **kwargs):
 def max(arr, *args, **kwargs):
     return cupy.max(arr.__array__(), *args, **kwargs)
 
+@cast
+@implements(np.maximum)
+def maximum(arr, *args, **kwargs):
+    return cupy.maximum(arr.__array__(), *args, **kwargs)
 @implements(np.average)
 def average(arr, *args, **kwargs):
     return cupy.average(arr.__array__(), *args, **kwargs)
