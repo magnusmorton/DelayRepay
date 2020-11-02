@@ -24,31 +24,6 @@ import numpy.lib.mixins  # type: ignore
 
 Shape = Tuple[int,int]
 
-OPS = {
-    'matmul': '@',
-    'add': '+',
-    'multiply': '*',
-    'subtract': '-',
-    'true_divide': '/',
-}
-
-FUNCS = {
-    'power': 'pow',
-    'arctan2': 'atan2',
-    'absolute': 'abs',
-    'sin':'sin',
-    'cos':'cos',
-    'tan':'tan',
-    'sqrt':'sqrt',
-    'log': 'log',
-    # HACK
-    'negative': '-',
-    'exp': 'exp',
-    'tanh': 'tanh',
-    'sinh': 'sinh',
-    'cosh': 'cosh'
-
-}
 
 ufunc_lookup = {
     'matmul': cupy.matmul,
@@ -194,7 +169,7 @@ def calc_shape(left, right, op=None):
 
 class Memoiser(type):
     '''Metaclass implementing caching'''
-    
+
     def __new__(meta, *args, **kwargs):
         cls = super(Memoiser, meta).__new__(meta, *args, **kwargs)
         meta._cache = {}
@@ -208,6 +183,7 @@ class Memoiser(type):
         if key not in cls._cache:
             Memoiser._cache[key] = super(Memoiser, cls).__call__(*args)
         return cls._cache[key]
+
 
 def reset():
     # hacks
@@ -430,18 +406,6 @@ def is_matrix_vector(left, right):
     return len(left) > 1 and len(right) == 1
 
 
-
-
-# def calc_type(func, type1, type2):
-#     if 'float64' in (type1, type2):
-#         return 'float64'
-#     elif 'float32' in (type1, type2):
-#         return 'float32'
-#     elif 'int64' in (type1, type2):
-#         return 'int64'
-#     else:
-#         return type1
-
 def calc_type(node1: NumpyEx, node2: NumpyEx) -> np.dtype:
     if node1.dtype is not None:
         node2.dtype = node1.dtype
@@ -474,14 +438,6 @@ def arg_to_numpy_ex(arg: Any) -> NumpyEx:
         raise NotImplementedError
 
 
-# def func_to_numpy_ex(func):
-#     return {
-#         'matmul': Matmul,
-#         'add': Add,
-#         'multiply': Multiply
-#         }[func.__name__]
-
-
 @implements(np.diag)
 def diag(arr, k=0):
     if isinstance(arr.ex, NPArray):
@@ -499,18 +455,16 @@ def diagflat(arr, k=0):
     # keep it simple for now
     return np.diagflat(np.asarray(arr, order='C'))
 
-#@implements(np.sum)
-#def sum(arr, axis=None, dtype=None, out=None, keepdims=None, initial=None, where=None):
-#    print("BLAH")
-#    return ReduceEx(np.add, arr)
 
 @implements(np.var)
 def var(arr, *args, **kwargs):
     return cupy.var(arr.__array__(), *args, **kwargs)
 
+
 @implements(np.sum)
 def sum(arr, *args, **kwargs):
     return cupy.sum(arr.__array__(), *args, **kwargs)
+
 
 @implements(np.transpose)
 @cast
@@ -523,36 +477,45 @@ def transpose(arr, *args, **kwargs):
 def roll(arr, *args, **kwargs):
     return cupy.roll(arr.__array__(), *args, **kwargs)
 
+
 @implements(np.max)
 def max(arr, *args, **kwargs):
     return cupy.max(arr.__array__(), *args, **kwargs)
+
 
 @cast
 @implements(np.maximum)
 def maximum(arr, *args, **kwargs):
     return cupy.maximum(arr.__array__(), *args, **kwargs)
+
+
 @implements(np.average)
 def average(arr, *args, **kwargs):
     return cupy.average(arr.__array__(), *args, **kwargs)
+
 
 @implements(np.repeat)
 @cast
 def repeat(arr, *args, **kwargs):
     return cupy.repeat(arr.__array__(), *args, **kwargs)
 
+
 @cast
 @implements(np.cumsum)
 def cumsum(arr, *args, **kwargs):
     return cupy.cumsum(arr.__array__(), *args, **kwargs)
 
+
 @implements(np.greater)
 def greater(arr1, arr2, *args, **kwargs):
     return cupy.greater(arr1.__array__(), arr2, *args, **kwargs)
 
+
 @implements(np.less)
 def less(arr1, arr2, *args, **kwargs):
     return cupy.less(arr1.__array__(), arr2, *args, **kwargs)
-#sum = cast(cupy.sum)
+
+
 add = np.add
 multiply = np.multiply
 dot = np.dot
@@ -572,7 +535,7 @@ square = np.square
 abs = np.abs
 newaxis = cupy.newaxis
 
-#dtypes etc.
+# dtypes etc.
 double = np.double
 float32 = np.float32
 uint32 = np.uint32
@@ -628,13 +591,14 @@ vander = cast(np.vander)
 
 InputDict = Dict[str, 'BaseFragment']
 
+
 class BaseFragment:
     def __init__(self):
         self.name = None
         self.stmts = []
         self._expr = None
         self._inputs = {}
-        
+
     @property
     def inputs(self) -> InputDict:
         return self._inputs
@@ -659,8 +623,6 @@ class Fragment(BaseFragment):
         self.name = name
         self.stmts = stmts
         self._inputs = inputs
-        #self.dtype = np.float32
-        
 
     def ref(self) -> str:
         return self.name
@@ -676,12 +638,11 @@ class Fragment(BaseFragment):
         inargs = [f"T {arg}" for arg in self.kernel_args]
         kern = cupy.ElementwiseKernel(
             ",".join(inargs),
-            f"T out",
+            "T out",
             f"{body};\nout = {self.name}",
             f"delay_repay_{self.name}"
         )
         return kern
-
 
 
 class InputFragment(BaseFragment):
@@ -697,16 +658,6 @@ class InputFragment(BaseFragment):
     def expr(self) -> str:
         return f"{self.name}"
 
-
-# dtype_map = {np.dtype("float32"): "float",
-#              np.dtype("float64"): "double",
-#              np.dtype("int32"): "int",
-#              np.dtype("int64"): "long"}
-
-# dtype_map = {np.dtype("float32"): "f",
-#              np.dtype("float64"): "",
-#              np.dtype("int32"): "",
-#              np.dtype("int64"): ""}
 
 class ScalarFragment(BaseFragment):
     def __init__(self, val: Scalar) -> None:
@@ -750,108 +701,3 @@ class PrettyPrinter(Visitor):
             return self.list_visit(node)
         print(type(node).__name__)
         self.visit(node.children)
-
-class Fuser(Visitor):
-    def __init__(self):
-        super().__init__()
-        self.seen = {}
-        self.splits = []
-    
-    def fuse(self, node):
-        
-        self.visit(node)
-        self.splits.append(node)
-        return self.splits
-
-    def visit(self, node) -> Shape:
-        if isinstance(node, list):
-            return self.list_visit(node)
-        child_shapes = self.list_visit(node.children)
-        new = []
-        for child, shape in zip(node.children, child_shapes):
-            if shape != node.shape and shape != (0,):
-                new.append(NPRef(child, node.shape))
-                self.splits.append(child)
-            else:
-                new.append(child)
-
-        node.children = new
-
-        return node.shape
-
-class CupyEmitter(Visitor):
-
-    def __init__(self):
-        super().__init__()
-        self.ins = {}
-        self.outs = []
-        self.kernels = []
-        self.seen = {}
-        self.count = 0
-
-    def visit(self, node):
-        if node in self.seen:
-            visited = self.seen[node]
-        else:
-            visited = super().visit(node)
-            self.seen[node] = visited
-            self.count += 1
-        return visited
-
-    def visit_BinaryNumpyEx(self,
-                            node: BinaryNumpyEx) -> BaseFragment:
-        op = node.to_op()
-        left = self.visit(node.children[0])
-        right = self.visit(node.children[1])
-        name = f'binex{self.count}'
-        stmt = f"T {name} = {left.ref()} {op} {right.ref()}"
-        stmts = left.stmts + right.stmts + [stmt]
-        return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs))
-
-    def visit_UnaryFuncEx(self,
-                          node: UnaryFuncEx) -> BaseFragment:
-        inner = self.visit(node.children[0])
-        name = f'unfunc{self.count}'
-        stmts = inner.stmts + [f"T {name} = {node.to_op()}({inner.ref()})"]
-        return Fragment(name, stmts, inner.inputs)
-
-    def visit_BinaryFuncEx(self,
-                           node: BinaryFuncEx) -> BaseFragment:
-        op = node.to_op()
-        left = self.visit(node.children[0])
-        right = self.visit(node.children[1])
-        name = f'binfunc{self.count}'
-        stmt = f"T {name} = {op}({left.ref()}, {right.ref()})"
-        stmts = left.stmts + right.stmts + [stmt]
-        return Fragment(name, stmts, combine_inputs(left.inputs,
-                        right.inputs))
-    
-    def visit_NPArray(self,
-                      node: NPArray) -> BaseFragment:
-        return InputFragment(f'arr{self.count}', node)
-
-    def visit_NPRef(self,
-                    node: NPRef) -> BaseFragment:
-        return InputFragment(f'ref{self.count}', node)
-
-    def visit_Scalar(self,
-                     node: Scalar) -> BaseFragment:
-        return ScalarFragment(node)
-
-    def visit_ReduceEx(self,
-                       node: ReduceEx) -> BaseFragment:
-        inner = self.visit(node.children[0])
-        name = node.name
-        op = node.to_op()
-
-        return NotImplemented
-
-def run_gpu(ex: NumpyEx) -> cupy.array:
-    visitor = CupyEmitter()
-    kerns = [visitor.visit(ex)]
-    for kern in kerns:
-        compiled = kern.to_kern()
-        inputs = [value.array for key, value in kern.kernel_args.items()]
-        ret = compiled(*inputs)
-        kern.array = ret
-    return ret
