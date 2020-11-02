@@ -18,20 +18,11 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 
 from numbers import Number
 from typing import Any, List, Dict, Tuple, Optional, Union, Set
-import cupy  # type: ignore
 import numpy as np  # type: ignore
 import numpy.lib.mixins  # type: ignore
+import delayrepay.cuda as backend
 
 Shape = Tuple[int, int]
-
-
-ufunc_lookup = {
-    "matmul": cupy.matmul,
-    "add": cupy.add,
-    "multiply": cupy.multiply,
-    "subtract": cupy.subtract,
-    "true_divide": cupy.true_divide,
-}
 
 
 def cast(func):
@@ -58,7 +49,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         try:
             return self.array
         except AttributeError:
-            self.array = run_gpu(self)
+            self.array = backend.run_gpu(self)
             return self.array
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
@@ -68,7 +59,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             if not isinstance(left, Number) and not isinstance(right, Number):
                 if left.shape != right.shape:
                     if left.shape != (0,) and right.shape != (0,):
-                        return ufunc_lookup[ufunc.__name__](
+                        return backend.ufunc_lookup[ufunc.__name__](
                             left.__array__(), right.__array__()
                         )
         if ufunc.__name__ == "matmul":
@@ -94,7 +85,9 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
         left = args[0].__array__()
         right = args[1].__array__()
-        return cupy.dot(left, right)
+
+        # TODO: independent fallback mechanism
+        return np.dot(left, right)
 
     def __array_function__(self, func, types, args, kwargs):
         if func.__name__ == "dot":
@@ -154,298 +147,15 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         return repeat(self, *args, **kwargs)
 
 
-def calc_shape(left, right, op=None):
-    if left == (0,):
-        return right
-    if right is (0,):
-        return left
-    if op.__name__ in OPS:
-        return left
-    if op.__name__ == "dot":
-        # for now
-        if len(left) > 1 and len(right) > 1:
-            return (left[0], right[1])
-        elif len(left) > 1:
-            return (left[0],)
-        else:
-            return (0,)
-    else:
-        return left
-
-
-class Memoiser(type):
-    """Metaclass implementing caching"""
-
-    def __new__(meta, *args, **kwargs):
-        cls = super(Memoiser, meta).__new__(meta, *args, **kwargs)
-        meta._cache = {}
-        return cls
-
-    def __call__(cls, *args):
-        if type(args[0]).__name__ == "ndarray":
-            key = id(args[0])
-        else:
-            key = hash(args)
-        if key not in cls._cache:
-            Memoiser._cache[key] = super(Memoiser, cls).__call__(*args)
-        return cls._cache[key]
-
-
-def reset():
-    # hacks
-    Memoiser._cache.clear()
-
-
-class NumpyEx(DelayArray, metaclass=Memoiser):
-    children: List["NumpyEx"]
-    """Numpy expression"""
-
-    def __init__(self, children: List["NumpyEx"] = []):
-        super().__init__()
-        self.dtype = None
-        self.children = children
-
-    def __hash__(self):
-        """
-        Should work because of the Memoizer
-        """
-        return id(self)
-
-
-class Funcable:
-    def to_op(self):
-        return OPS[self.func.__name__]
-
-
-class ReduceEx(NumpyEx, Funcable):
-    def __init__(self, func, arg):
-        super().__init__(children=[arg])
-        self.func = func
-        self.shape = (0,)
-
-    # func: np.ufunc
-    # arg: NumpyEx
-
-
-class UnaryFuncEx(NumpyEx, Funcable):
-    def __init__(self, func, arg):
-        super().__init__(children=[arg])
-        self.func = func
-        self.shape = arg.shape
-        self.dtype = arg.dtype
-
-    def to_op(self):
-        return FUNCS[self.func.__name__]
-
-
-class BinaryFuncEx(NumpyEx):
-    def __init__(self, func, left, right):
-        super().__init__(children=[left, right])
-        self.func = func
-        self.shape = calc_shape(left.shape, right.shape, func)
-        self.dtype = calc_type(left, right)
-
-    def to_op(self):
-        return FUNCS[self.func.__name__]
-
-
-def pow_ex(func, left, right):
-    if not isinstance(right.val, int):
-        return BinaryFuncEx(func, left, right)
-    ex = left
-    for i in range(right.val - 1):
-        # will give odd expression tree, but OK
-        ex = BinaryNumpyEx(multiply, ex, left)
-
-    return ex
-
-
-def create_ex(func, args):
-    if func.__name__ in OPS:
-        return BinaryNumpyEx(func, *args)
-    if func.__name__ == "square":
-        return BinaryNumpyEx(multiply, args[0], args[0])
-    if len(args) == 1:
-        return UnaryFuncEx(func, *args)
-    if func.__name__ == "power":
-        return pow_ex(func, *args)
-    return BinaryFuncEx(func, *args)
-
-
-class BinaryNumpyEx(NumpyEx, Funcable):
-    """Binary numpy expression"""
-
-    def __init__(self, func, left, right):
-        super().__init__(children=[left, right])
-        self.func = func
-        self.shape = calc_shape(left.shape, right.shape, func)
-        self.dtype = calc_type(left, right)
-
-
-class MMEx(NumpyEx, Funcable):
-    # arg1: NumpyEx
-    # arg2: NumpyEx
-    def __init__(self, arg1, arg2):
-        super().__init__()
-        self.arg1 = arg1
-        self.arg2 = arg2
-        self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
-
-
-class MVEx(NumpyEx, Funcable):
-    # arg1: NumpyEx
-    # arg2: NumpyEx
-    def __init__(self, arg1, arg2):
-        super().__init__()
-        self.arg1 = arg1
-        self.arg2 = arg2
-        self.shape = calc_shape(arg1.shape, arg2.shape, np.dot)
-
-
-class DotEx(NumpyEx, Funcable):
-    def __init__(self, left, right):
-        super().__init__()
-        self.arg1 = left
-        self.arg2 = right
-        self.shape = calc_shape(left.shape, right.shape, np.dot)
-        self._inshape = left.shape
-
-
-class NPArray(NumpyEx):
-    """ndarray"""
-
-    def __init__(self, array):
-        super().__init__()
-        self.array = array
-        self.shape = array.shape
-        self.dtype = array.dtype
-
-    def __hash__(self):
-        return id(self.array)
-
-    def __eq__(self, other):
-        try:
-            return self.array is other.array
-        except AttributeError:
-            return False
-
-    def astype(self, *args, **kwargs):
-        old = self.array
-        cast_arr = self.array.astype(*args, **kwargs)
-        del NPArray._cache[id(old)]
-        NPArray._cache[id(cast_arr)] = self
-        self.array = cast_arr
-        self.dtype = cast_arr.dtype
-        return self
-
-
-class NPRef(NumpyEx):
-    """Only for when breaking dependency chains for fusion"""
-
-    def __init__(self, node: NumpyEx, shape: Shape):
-        super().__init__()
-        self.ref = node
-        self.children = []
-        self.shape = shape
-
-    @property
-    def array(self):
-        return self.ref.array
-
-
-class Scalar(NumpyEx):
-    """a scalar"""
-
-    # val: Number
-    def __init__(self, val):
-        super().__init__()
-        self.val = val
-        self.shape = (0,)
-
-    def __hash__(self):
-        return hash(self.val)
-
-
-class Visitor:
-    """Visitor ABC"""
-
-    def visit(self, node) -> Any:
-        """Visit a node."""
-        if isinstance(node, list):
-            visitor = self.list_visit
-        else:
-            method = "visit_" + node.__class__.__name__
-            visitor = getattr(self, method, self.default_visit)
-        return visitor(node)
-
-    def list_visit(self, lst, **kwargs):
-        return [self.visit(node) for node in lst]
-
-    def default_visit(self, node):
-        return node
-
-
-class NumpyVisitor(Visitor):
-    """Visits Numpy Expression"""
-
-    def __init__(self):
-        self.visits = 0
-
-    def visit(self, node):
-        """Visit a node."""
-        self.visits += 1
-        return super(NumpyVisitor, self).visit(node)
-
-    def visit_BinaryExpression(self, node):
-        return node
-
-    def walk(self, tree):
-        """ top-level walk of tree"""
-        self.visits = 0
-        return self.visit(tree)
-
-
-def is_matrix_matrix(left, right):
-    return len(left) > 1 and len(right) > 1
-
-
-def is_matrix_vector(left, right):
-    return len(left) > 1 and len(right) == 1
-
-
-def calc_type(node1: NumpyEx, node2: NumpyEx) -> np.dtype:
-    if node1.dtype is not None:
-        node2.dtype = node1.dtype
-        return node1.dtype
-    node1.dtype = node2.dtype
-    return node2.dtype
-
-
 HANDLED_FUNCTIONS = {}
 
 
 def implements(np_function):
     "Register an __array_function__ implementation for DiagonalArray objects."
-
     def decorator(func):
         HANDLED_FUNCTIONS[np_function] = func
         return func
-
     return decorator
-
-
-def arg_to_numpy_ex(arg: Any) -> NumpyEx:
-    from numbers import Number
-
-    if isinstance(arg, DelayArray):
-        return arg
-    elif isinstance(arg, Number):
-        return Scalar(arg)
-    elif isinstance(arg, cupy.core.core.ndarray) or isinstance(arg, np.ndarray):
-        return NPArray(arg)
-    else:
-        print(type(arg))
-        raise NotImplementedError
 
 
 @implements(np.diag)
@@ -468,62 +178,62 @@ def diagflat(arr, k=0):
 
 @implements(np.var)
 def var(arr, *args, **kwargs):
-    return cupy.var(arr.__array__(), *args, **kwargs)
+    return backend.fallback.var(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.sum)
 def sum(arr, *args, **kwargs):
-    return cupy.sum(arr.__array__(), *args, **kwargs)
+    return backend.fallback.sum(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.transpose)
 @cast
 def transpose(arr, *args, **kwargs):
-    return cupy.transpose(arr.__array__(), *args, **kwargs)
+    return backend.fallback.transpose(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.roll)
 @cast
 def roll(arr, *args, **kwargs):
-    return cupy.roll(arr.__array__(), *args, **kwargs)
+    return backend.fallback.roll(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.max)
 def max(arr, *args, **kwargs):
-    return cupy.max(arr.__array__(), *args, **kwargs)
+    return backend.fallback.max(arr.__array__(), *args, **kwargs)
 
 
 @cast
 @implements(np.maximum)
 def maximum(arr, *args, **kwargs):
-    return cupy.maximum(arr.__array__(), *args, **kwargs)
+    return backend.fallback.maximum(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.average)
 def average(arr, *args, **kwargs):
-    return cupy.average(arr.__array__(), *args, **kwargs)
+    return backend.fallback.average(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.repeat)
 @cast
 def repeat(arr, *args, **kwargs):
-    return cupy.repeat(arr.__array__(), *args, **kwargs)
+    return backend.fallback.repeat(arr.__array__(), *args, **kwargs)
 
 
 @cast
 @implements(np.cumsum)
 def cumsum(arr, *args, **kwargs):
-    return cupy.cumsum(arr.__array__(), *args, **kwargs)
+    return backend.fallback.cumsum(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.greater)
 def greater(arr1, arr2, *args, **kwargs):
-    return cupy.greater(arr1.__array__(), arr2, *args, **kwargs)
+    return backend.fallback.greater(arr1.__array__(), arr2, *args, **kwargs)
 
 
 @implements(np.less)
 def less(arr1, arr2, *args, **kwargs):
-    return cupy.less(arr1.__array__(), arr2, *args, **kwargs)
+    return backend.fallback.less(arr1.__array__(), arr2, *args, **kwargs)
 
 
 add = np.add
@@ -543,7 +253,7 @@ power = np.power
 sqrt = np.sqrt
 square = np.square
 abs = np.abs
-newaxis = cupy.newaxis
+newaxis = backend.fallback.newaxis
 
 # dtypes etc.
 double = np.double
@@ -551,16 +261,16 @@ float32 = np.float32
 uint32 = np.uint32
 
 # Ones and zeros
-empty = cast(cupy.empty)
-empty_like = cast(cupy.empty_like)
-eye = cast(cupy.eye)
-identity = cast(cupy.identity)
-ones = cast(cupy.ones)
-ones_like = cast(cupy.ones_like)
-zeros = cast(cupy.zeros)
-zeros_like = cast(cupy.zeros_like)
-full = cast(cupy.full)
-full_like = cast(cupy.full_like)
+empty = cast(backend.fallback.empty)
+empty_like = cast(backend.fallback.empty_like)
+eye = cast(backend.fallback.eye)
+identity = cast(backend.fallback.identity)
+ones = cast(backend.fallback.ones)
+ones_like = cast(backend.fallback.ones_like)
+zeros = cast(backend.fallback.zeros)
+zeros_like = cast(backend.fallback.zeros_like)
+full = cast(backend.fallback.full)
+full_like = cast(backend.fallback.full_like)
 
 
 @implements(np.tile)
@@ -570,17 +280,17 @@ def tile(arr, *args, **kwargs):
     if isinstance(arr, DelayArray):
         temp = np.array(arr.__array__().get())
         print(type(temp))
-    return cupy.tile(temp, *args, **kwargs)
+    return backend.fallback.tile(temp, *args, **kwargs)
 
 
 # From existing data
 
-array = cast(cupy.array)
-asarray = cast(cupy.asarray)
-asanyarray = cast(cupy.asanyarray)
-ascontiguousarray = cast(cupy.ascontiguousarray)
+array = cast(backend.fallback.array)
+asarray = cast(backend.fallback.asarray)
+asanyarray = cast(backend.fallback.asanyarray)
+ascontiguousarray = cast(backend.fallback.ascontiguousarray)
 asmatrix = cast(np.asmatrix)
-copy = cast(cupy.copy)
+copy = cast(backend.fallback.copy)
 frombuffer = cast(np.frombuffer)
 fromfile = cast(np.fromfile)
 fromfunction = cast(np.fromfunction)
@@ -589,114 +299,14 @@ fromstring = cast(np.fromstring)
 loadtxt = cast(np.loadtxt)
 
 # Numerical ranges
-arange = cast(cupy.arange)
-linspace = cast(cupy.linspace)
-logspace = cast(cupy.logspace)
+arange = cast(backend.fallback.arange)
+linspace = cast(backend.fallback.linspace)
+logspace = cast(backend.fallback.logspace)
 geomspace = cast(np.geomspace)
 
 
 # Building matrices
-tri = cast(cupy.tri)
-tril = cast(cupy.tril)
-triu = cast(cupy.triu)
+tri = cast(backend.fallback.tri)
+tril = cast(backend.fallback.tril)
+triu = cast(backend.fallback.triu)
 vander = cast(np.vander)
-
-InputDict = Dict[str, "BaseFragment"]
-
-
-class BaseFragment:
-    def __init__(self):
-        self.name = None
-        self.stmts = []
-        self._expr = None
-        self._inputs = {}
-
-    @property
-    def inputs(self) -> InputDict:
-        return self._inputs
-
-    @property
-    def kernel_args(self) -> InputDict:
-        return self._inputs
-
-
-def dedup(seq):
-    seen = set()
-    seen_add = seen.add
-    return [x for x in seq if not (x in seen or seen_add(x))]
-
-
-class Fragment(BaseFragment):
-    def __init__(self, name: str, stmts: List[str], inputs: InputDict) -> None:
-        self.name = name
-        self.stmts = stmts
-        self._inputs = inputs
-
-    def ref(self) -> str:
-        return self.name
-
-    # def expr(self) -> str:
-    #     return self._expr
-
-    def to_input(self):
-        return {self.name: self.node.array}
-
-    def to_kern(self) -> cupy.ElementwiseKernel:
-        body = ";\n".join(dedup(self.stmts))
-        inargs = [f"T {arg}" for arg in self.kernel_args]
-        kern = cupy.ElementwiseKernel(
-            ",".join(inargs),
-            "T out",
-            f"{body};\nout = {self.name}",
-            f"delay_repay_{self.name}",
-        )
-        return kern
-
-
-class InputFragment(BaseFragment):
-    def __init__(self, name: str, arr: Union[NPArray, NPRef]) -> None:
-        super().__init__()
-        self.name = name
-        self._inputs = {self.name: arr}
-
-    def ref(self) -> str:
-        return f"{self.name}"
-
-    def expr(self) -> str:
-        return f"{self.name}"
-
-
-class ScalarFragment(BaseFragment):
-    def __init__(self, val: Scalar) -> None:
-        super().__init__()
-        self.val = val.val
-        self.dtype = val.dtype
-
-    def ref(self) -> str:
-        return str(self.val)
-
-    def expr(self) -> str:
-        return str(self.val)
-
-
-class ReductionKernel(Fragment):
-    def to_kern(self):
-        kern = cupy.ReductionKernel(
-            ",".join(inargs), "T out", self.expr, self.redex, "out = a", 0, self.name
-        )
-        return kern
-
-
-def combine_inputs(*args: InputDict) -> InputDict:
-    ret = {}
-    for arg in args:
-        ret.update(arg)
-    return ret
-
-
-class PrettyPrinter(Visitor):
-    def visit(self, node):
-        if isinstance(node, list):
-            return self.list_visit(node)
-        print(type(node).__name__)
-        self.visit(node.children)
