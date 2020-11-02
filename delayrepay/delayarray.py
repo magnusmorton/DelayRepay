@@ -22,28 +22,31 @@ import cupy  # type: ignore
 import numpy as np  # type: ignore
 import numpy.lib.mixins  # type: ignore
 
-Shape = Tuple[int,int]
+Shape = Tuple[int, int]
 
 
 ufunc_lookup = {
-    'matmul': cupy.matmul,
-    'add': cupy.add,
-    'multiply': cupy.multiply,
-    'subtract': cupy.subtract,
-    'true_divide': cupy.true_divide
+    "matmul": cupy.matmul,
+    "add": cupy.add,
+    "multiply": cupy.multiply,
+    "subtract": cupy.subtract,
+    "true_divide": cupy.true_divide,
 }
 
+
 def cast(func):
-    '''cast to Delay array decorator'''
+    """cast to Delay array decorator"""
+
     def wrapper(*args, **kwargs):
         arr = func(*args, **kwargs)
         if not isinstance(arr, DelayArray):
             arr = NPArray(arr)
         return arr
+
     return wrapper
 
+
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
-    
     def __init__(self, *args, **kwargs):
         self._memo = None
 
@@ -65,8 +68,10 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             if not isinstance(left, Number) and not isinstance(right, Number):
                 if left.shape != right.shape:
                     if left.shape != (0,) and right.shape != (0,):
-                        return ufunc_lookup[ufunc.__name__](left.__array__(), right.__array__())
-        if ufunc.__name__ == 'matmul':
+                        return ufunc_lookup[ufunc.__name__](
+                            left.__array__(), right.__array__()
+                        )
+        if ufunc.__name__ == "matmul":
             return self._dot(inputs, kwargs)
         # cls = func_to_numpy_ex(ufunc)
         args = [arg_to_numpy_ex(arg) for arg in inputs]
@@ -113,7 +118,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def reshape(self, *args, **kwargs):
         return NPArray(self.__array__().reshape(*args, **kwargs))
-            
+
     def __setitem__(self, key, item):
         arr = self.__array__()
         if isinstance(key, DelayArray):
@@ -144,9 +149,10 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         if len(self.shape) == 1:
             return self
         return np.transpose(self)
-    
+
     def repeat(self, *args, **kwargs):
         return repeat(self, *args, **kwargs)
+
 
 def calc_shape(left, right, op=None):
     if left == (0,):
@@ -155,7 +161,7 @@ def calc_shape(left, right, op=None):
         return left
     if op.__name__ in OPS:
         return left
-    if op.__name__ == 'dot':
+    if op.__name__ == "dot":
         # for now
         if len(left) > 1 and len(right) > 1:
             return (left[0], right[1])
@@ -168,7 +174,7 @@ def calc_shape(left, right, op=None):
 
 
 class Memoiser(type):
-    '''Metaclass implementing caching'''
+    """Metaclass implementing caching"""
 
     def __new__(meta, *args, **kwargs):
         cls = super(Memoiser, meta).__new__(meta, *args, **kwargs)
@@ -191,18 +197,20 @@ def reset():
 
 
 class NumpyEx(DelayArray, metaclass=Memoiser):
-    children : List['NumpyEx']
-    '''Numpy expression'''
-    def __init__(self, children: List['NumpyEx']=[]):
+    children: List["NumpyEx"]
+    """Numpy expression"""
+
+    def __init__(self, children: List["NumpyEx"] = []):
         super().__init__()
         self.dtype = None
         self.children = children
 
     def __hash__(self):
-        '''
+        """
         Should work because of the Memoizer
-        '''
+        """
         return id(self)
+
 
 class Funcable:
     def to_op(self):
@@ -220,7 +228,6 @@ class ReduceEx(NumpyEx, Funcable):
 
 
 class UnaryFuncEx(NumpyEx, Funcable):
-
     def __init__(self, func, arg):
         super().__init__(children=[arg])
         self.func = func
@@ -232,15 +239,15 @@ class UnaryFuncEx(NumpyEx, Funcable):
 
 
 class BinaryFuncEx(NumpyEx):
-
     def __init__(self, func, left, right):
-        super().__init__(children=[left,right])
+        super().__init__(children=[left, right])
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
         self.dtype = calc_type(left, right)
-        
+
     def to_op(self):
         return FUNCS[self.func.__name__]
+
 
 def pow_ex(func, left, right):
     if not isinstance(right.val, int):
@@ -253,29 +260,27 @@ def pow_ex(func, left, right):
     return ex
 
 
-
 def create_ex(func, args):
     if func.__name__ in OPS:
         return BinaryNumpyEx(func, *args)
-    if func.__name__ == 'square':
+    if func.__name__ == "square":
         return BinaryNumpyEx(multiply, args[0], args[0])
     if len(args) == 1:
         return UnaryFuncEx(func, *args)
-    if func.__name__ == 'power':
+    if func.__name__ == "power":
         return pow_ex(func, *args)
     return BinaryFuncEx(func, *args)
 
 
 class BinaryNumpyEx(NumpyEx, Funcable):
-    '''Binary numpy expression'''
+    """Binary numpy expression"""
 
     def __init__(self, func, left, right):
-        super().__init__(children=[left,right])
+        super().__init__(children=[left, right])
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
         self.dtype = calc_type(left, right)
 
-  
 
 class MMEx(NumpyEx, Funcable):
     # arg1: NumpyEx
@@ -298,7 +303,6 @@ class MVEx(NumpyEx, Funcable):
 
 
 class DotEx(NumpyEx, Funcable):
-
     def __init__(self, left, right):
         super().__init__()
         self.arg1 = left
@@ -307,10 +311,8 @@ class DotEx(NumpyEx, Funcable):
         self._inshape = left.shape
 
 
-
-
 class NPArray(NumpyEx):
-    '''ndarray'''
+    """ndarray"""
 
     def __init__(self, array):
         super().__init__()
@@ -330,16 +332,17 @@ class NPArray(NumpyEx):
     def astype(self, *args, **kwargs):
         old = self.array
         cast_arr = self.array.astype(*args, **kwargs)
-        del(NPArray._cache[id(old)])
+        del NPArray._cache[id(old)]
         NPArray._cache[id(cast_arr)] = self
         self.array = cast_arr
         self.dtype = cast_arr.dtype
         return self
 
+
 class NPRef(NumpyEx):
-    '''Only for when breaking dependency chains for fusion'''
-    
-    def __init__(self, node:NumpyEx, shape:Shape):
+    """Only for when breaking dependency chains for fusion"""
+
+    def __init__(self, node: NumpyEx, shape: Shape):
         super().__init__()
         self.ref = node
         self.children = []
@@ -349,8 +352,10 @@ class NPRef(NumpyEx):
     def array(self):
         return self.ref.array
 
+
 class Scalar(NumpyEx):
-    '''a scalar'''
+    """a scalar"""
+
     # val: Number
     def __init__(self, val):
         super().__init__()
@@ -362,13 +367,14 @@ class Scalar(NumpyEx):
 
 
 class Visitor:
-    '''Visitor ABC'''
+    """Visitor ABC"""
+
     def visit(self, node) -> Any:
         """Visit a node."""
         if isinstance(node, list):
             visitor = self.list_visit
         else:
-            method = 'visit_' + node.__class__.__name__
+            method = "visit_" + node.__class__.__name__
             visitor = getattr(self, method, self.default_visit)
         return visitor(node)
 
@@ -380,7 +386,8 @@ class Visitor:
 
 
 class NumpyVisitor(Visitor):
-    '''Visits Numpy Expression'''
+    """Visits Numpy Expression"""
+
     def __init__(self):
         self.visits = 0
 
@@ -393,7 +400,7 @@ class NumpyVisitor(Visitor):
         return node
 
     def walk(self, tree):
-        ''' top-level walk of tree'''
+        """ top-level walk of tree"""
         self.visits = 0
         return self.visit(tree)
 
@@ -419,14 +426,17 @@ HANDLED_FUNCTIONS = {}
 
 def implements(np_function):
     "Register an __array_function__ implementation for DiagonalArray objects."
+
     def decorator(func):
         HANDLED_FUNCTIONS[np_function] = func
         return func
+
     return decorator
 
 
 def arg_to_numpy_ex(arg: Any) -> NumpyEx:
     from numbers import Number
+
     if isinstance(arg, DelayArray):
         return arg
     elif isinstance(arg, Number):
@@ -442,7 +452,7 @@ def arg_to_numpy_ex(arg: Any) -> NumpyEx:
 def diag(arr, k=0):
     if isinstance(arr.ex, NPArray):
         arr._ndarray = np.ascontiguousarray(np.diag(arr._ndarray, k))
-        assert(arr._ndarray.flags['C_CONTIGUOUS'])
+        assert arr._ndarray.flags["C_CONTIGUOUS"]
         arr.ex = NPArray(arr._ndarray)
         return arr
     else:
@@ -453,7 +463,7 @@ def diag(arr, k=0):
 @cast
 def diagflat(arr, k=0):
     # keep it simple for now
-    return np.diagflat(np.asarray(arr, order='C'))
+    return np.diagflat(np.asarray(arr, order="C"))
 
 
 @implements(np.var)
@@ -552,6 +562,7 @@ zeros_like = cast(cupy.zeros_like)
 full = cast(cupy.full)
 full_like = cast(cupy.full_like)
 
+
 @implements(np.tile)
 @cast
 def tile(arr, *args, **kwargs):
@@ -560,6 +571,7 @@ def tile(arr, *args, **kwargs):
         temp = np.array(arr.__array__().get())
         print(type(temp))
     return cupy.tile(temp, *args, **kwargs)
+
 
 # From existing data
 
@@ -589,7 +601,7 @@ tril = cast(cupy.tril)
 triu = cast(cupy.triu)
 vander = cast(np.vander)
 
-InputDict = Dict[str, 'BaseFragment']
+InputDict = Dict[str, "BaseFragment"]
 
 
 class BaseFragment:
@@ -615,11 +627,7 @@ def dedup(seq):
 
 
 class Fragment(BaseFragment):
-
-    def __init__(self,
-                 name: str,
-                 stmts: List[str],
-                 inputs: InputDict) -> None:
+    def __init__(self, name: str, stmts: List[str], inputs: InputDict) -> None:
         self.name = name
         self.stmts = stmts
         self._inputs = inputs
@@ -640,13 +648,12 @@ class Fragment(BaseFragment):
             ",".join(inargs),
             "T out",
             f"{body};\nout = {self.name}",
-            f"delay_repay_{self.name}"
+            f"delay_repay_{self.name}",
         )
         return kern
 
 
 class InputFragment(BaseFragment):
-
     def __init__(self, name: str, arr: Union[NPArray, NPRef]) -> None:
         super().__init__()
         self.name = name
@@ -673,19 +680,11 @@ class ScalarFragment(BaseFragment):
 
 
 class ReductionKernel(Fragment):
-
     def to_kern(self):
-        kern = cupy.ReductionKernel(','.join(inargs),
-                                    'T out',
-                                    self.expr,
-                                    self.redex,
-                                    'out = a',
-                                    0,
-                                    self.name)
+        kern = cupy.ReductionKernel(
+            ",".join(inargs), "T out", self.expr, self.redex, "out = a", 0, self.name
+        )
         return kern
-
-
-
 
 
 def combine_inputs(*args: InputDict) -> InputDict:
@@ -694,8 +693,8 @@ def combine_inputs(*args: InputDict) -> InputDict:
         ret.update(arg)
     return ret
 
+
 class PrettyPrinter(Visitor):
-    
     def visit(self, node):
         if isinstance(node, list):
             return self.list_visit(node)
