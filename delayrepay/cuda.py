@@ -724,7 +724,7 @@ class ScalarFragment(BaseFragment):
 class ReductionKernel(Fragment):
 
     def to_kern(self):
-        kern = cupy.ReductionKernel(','.join(inargs),
+        kern = cupy.ReductionKernel(','.join(self.inargs),
                                     'T out',
                                     self.expr,
                                     self.redex,
