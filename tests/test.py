@@ -6,6 +6,8 @@ import numpy.testing as npt
 
 SIZE = 64
 
+def assertEqF(one, two):
+    return abs(one-two) < 0.001
 
 class TestElwise(unittest.TestCase):
     # pylint: disable=C
@@ -84,17 +86,17 @@ class TestVector(unittest.TestCase):
     def test_dot_method(self):
         res = self.arr.dot(self.arr2)
         test = self.np_arr.dot(self.np_arr2)
-        self.assertEqual(res, test)
+        assertEqF(res, test)
 
     def test_dot_func(self):
         res = np.dot(self.arr, self.arr2)
         test = self.np_arr.dot(self.np_arr2)
-        self.assertEqual(res, test)
+        assertEqF(res, test)
 
     def test_matmul(self):
         res = self.arr @ self.arr2
         test = self.np_arr @ self.np_arr2
-        self.assertEqual(res, test)
+        assertEqF(res, test)
 
     def test_sum(self):
         res = sum(self.arr)
