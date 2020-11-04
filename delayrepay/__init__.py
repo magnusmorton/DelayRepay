@@ -17,7 +17,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 # Copyright (C) 2020 by University of Edinburgh
 
 #from numpy import *
-from .cuarray import *
+from .delayarray import *
 import delayrepay.random
 
 import cupy

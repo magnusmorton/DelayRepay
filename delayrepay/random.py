@@ -16,7 +16,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 
 import cupy.random
 #from numpy.random import *
-from .cuarray import cast
+from .delayarray import cast
 
 rand = cast(cupy.random.rand)
 randn = cast(cupy.random.randn)

@@ -17,7 +17,8 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 from typing import Any, List, Dict, Tuple, Union
 import cupy  # type: ignore
 
-import delayrepay.ir as ir
+np = cupy
+fallback = cupy
 
 Shape = Tuple[int, int]
 
@@ -115,7 +116,7 @@ class Fragment(BaseFragment):
 
 
 class InputFragment(BaseFragment):
-    def __init__(self, name: str, arr: Union[ir.NPArray, ir.NPRef]) -> None:
+    def __init__(self, name, arr) -> None:
         super().__init__()
         self.name = name
         self._inputs = {self.name: arr}
@@ -128,7 +129,7 @@ class InputFragment(BaseFragment):
 
 
 class ScalarFragment(BaseFragment):
-    def __init__(self, val: ir.Scalar) -> None:
+    def __init__(self, val) -> None:
         super().__init__()
         self.val = val.val
         self.dtype = val.dtype
@@ -179,7 +180,7 @@ class CupyEmitter(Visitor):
             self.count += 1
         return visited
 
-    def visit_BinaryNumpyEx(self, node: ir.BinaryNumpyEx) -> BaseFragment:
+    def visit_BinaryNumpyEx(self, node) -> BaseFragment:
         op = node.to_op()
         left = self.visit(node.children[0])
         right = self.visit(node.children[1])
@@ -188,13 +189,13 @@ class CupyEmitter(Visitor):
         stmts = left.stmts + right.stmts + [stmt]
         return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs))
 
-    def visit_UnaryFuncEx(self, node: ir.UnaryFuncEx) -> BaseFragment:
+    def visit_UnaryFuncEx(self, node) -> BaseFragment:
         inner = self.visit(node.children[0])
         name = f"unfunc{self.count}"
         stmts = inner.stmts + [f"T {name} = {node.to_op()}({inner.ref()})"]
         return Fragment(name, stmts, inner.inputs)
 
-    def visit_BinaryFuncEx(self, node: ir.BinaryFuncEx) -> BaseFragment:
+    def visit_BinaryFuncEx(self, node) -> BaseFragment:
         op = node.to_op()
         left = self.visit(node.children[0])
         right = self.visit(node.children[1])
@@ -203,16 +204,16 @@ class CupyEmitter(Visitor):
         stmts = left.stmts + right.stmts + [stmt]
         return Fragment(name, stmts, combine_inputs(left.inputs, right.inputs))
 
-    def visit_NPArray(self, node: ir.NPArray) -> BaseFragment:
+    def visit_NPArray(self, node) -> BaseFragment:
         return InputFragment(f"arr{self.count}", node)
 
-    def visit_NPRef(self, node: ir.NPRef) -> BaseFragment:
+    def visit_NPRef(self, node) -> BaseFragment:
         return InputFragment(f"ref{self.count}", node)
 
-    def visit_Scalar(self, node: ir.Scalar) -> BaseFragment:
+    def visit_Scalar(self, node) -> BaseFragment:
         return ScalarFragment(node)
 
-    def visit_ReduceEx(self, node: ir.ReduceEx) -> BaseFragment:
+    def visit_ReduceEx(self, node) -> BaseFragment:
         inner = self.visit(node.children[0])
         name = node.name
         op = node.to_op()
@@ -220,7 +221,7 @@ class CupyEmitter(Visitor):
         return NotImplemented
 
 
-def run_gpu(ex: ir.NumpyEx) -> cupy.array:
+def run_gpu(ex) -> cupy.array:
     visitor = CupyEmitter()
     kerns = [visitor.visit(ex)]
     for kern in kerns:
