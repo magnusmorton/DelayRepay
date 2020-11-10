@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Any
+from typing import List
+
 
 @dataclass
 class LiftNode:
@@ -13,6 +14,7 @@ class LiftNode:
         '''convenience method for application'''
         return Apply(self, other)
 
+
 @dataclass
 class LiftType(LiftNode):
     '''A lift type'''
@@ -21,6 +23,7 @@ class LiftType(LiftNode):
 @dataclass
 class Atom(LiftNode):
     '''Atoms'''
+
 
 @dataclass
 class Seq(LiftType):
@@ -32,40 +35,48 @@ class Seq(LiftType):
 class Float(LiftType):
     '''A float'''
 
+
 @dataclass
 class Int(LiftType):
     '''An Int'''
+
 
 @dataclass
 class Var(Atom):
     '''Not functions/classes'''
     val: str
 
+
 @dataclass
 class Number(Atom):
     '''Numbers'''
     val: float
+
 
 @dataclass
 class String(Atom):
     '''Strings'''
     val: str
 
+
 @dataclass
 class SizeVar(LiftNode):
     ''' An array sizevar'''
     name: String
+
 
 @dataclass
 class ArrayTypeWSWC(LiftType):
     '''Funciton input array type'''
     dtype: LiftType
     sizevar: SizeVar
-    
+
+
 @dataclass
 class Unary(LiftNode):
     '''Unary function'''
     arg: LiftNode
+
 
 @dataclass
 class Binary(LiftNode):
@@ -78,9 +89,11 @@ class Binary(LiftNode):
 class Compose(Binary):
     '''Composition function'''
 
+
 @dataclass
 class Apply(Binary):
     '''Function application ($)'''
+
 
 @dataclass
 class Map(Unary):
@@ -90,36 +103,44 @@ class Map(Unary):
 class MapWrg(Map):
     '''Map function over workgroups?'''
 
+
 @dataclass
 class Join(LiftNode):
     '''Join. Not sure what it does. Barrier? '''
+
 
 @dataclass
 class MapLcl(Map):
     '''Map fuction over work items?'''
 
+
 @dataclass
 class MapSeq(Map):
     '''Map sequentially'''
+
 
 @dataclass
 class Split(Unary):
     '''Split data'''
 
+
 @dataclass
 class Zip(Binary):
     '''Zip'''
+
 
 @dataclass
 class Array(LiftNode):
     '''Lift Array type'''
     members: List[String]
 
+
 @dataclass
 class Lambda(LiftNode):
     '''A scala lambda'''
     args: List[Var]
     body: LiftNode
+
 
 @dataclass
 class UserFun(LiftNode):
@@ -129,6 +150,7 @@ class UserFun(LiftNode):
     body: String
     arg_type: LiftType
     ret_type: LiftType
+
 
 @dataclass
 class LiftFunction:
