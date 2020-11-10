@@ -16,12 +16,10 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 import cupy.fft
-from .cuarray import DelayArray
+from .delayarray import DelayArray
+
 
 def fft(self, *args, **kwargs):
-
-    print(args)
     nargs = [arg.__array__() if isinstance(arg, DelayArray) else arg
-            for arg in args]
-    print(nargs)
+             for arg in args]
     return cupy.fft.fft(*nargs, **kwargs)
