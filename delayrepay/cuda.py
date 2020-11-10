@@ -183,7 +183,7 @@ class CupyEmitter(Visitor):
         return NotImplemented
 
 
-def run_gpu(ex) -> cupy.array:
+def run(ex) -> cupy.array:
     visitor = CupyEmitter()
     kerns = [visitor.visit(ex)]
     for kern in kerns:
