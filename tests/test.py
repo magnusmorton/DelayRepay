@@ -65,7 +65,6 @@ class TestElwise(unittest.TestCase):
         npt.assert_array_almost_equal(res.get(), resn)
 
 
-
 class TestVector(unittest.TestCase):
     # pylint: disable=C
 
@@ -124,7 +123,6 @@ class TestMatrix(unittest.TestCase):
 
     def test_matvec(self):
         res = self.mat @ self.vec
-        print(res)
         test = self.np_mat @ self.np_vec
         npt.assert_array_almost_equal(res.get(), test)
 
