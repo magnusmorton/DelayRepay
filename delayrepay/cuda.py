@@ -27,6 +27,10 @@ Shape = Tuple[int, int]
 InputDict = Dict[str, "BaseFragment"]
 
 
+def is_ndarray(arr):
+    return isinstance(arr, cupy.core.core.ndarray)
+
+
 class BaseFragment:
     def __init__(self):
         self.name = None

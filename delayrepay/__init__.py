@@ -17,14 +17,17 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 # Copyright (C) 2020 by University of Edinburgh
 
 #from numpy import *
+import delayrepay.backend
 from .delayarray import *
 import delayrepay.random
 
-import cupy
 import delayrepay.fft
 
-cuda = cupy.cuda
+if delayrepay.backend.backend.__name__ == 'cupy':
+    import cupy
+    cuda = cupy.cuda
+
 
 fft = delayrepay.fft
 
-pi = cupy.pi
+pi = delayrepay.backend.backend.np.pi

@@ -18,9 +18,12 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 
 from numbers import Number
 from typing import Any, List, Tuple
+
 import numpy as np  # type: ignore
 import numpy.lib.mixins  # type: ignore
-import delayrepay.cuda as backend
+import delayrepay.backend as be
+
+_backend = be.backend
 
 
 def cast(func):
@@ -47,7 +50,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         try:
             return self.array
         except AttributeError:
-            self.array = backend.run(self)
+            self.array = _backend.run(self)
             return self.array
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
@@ -89,7 +92,7 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         right = args[1].__array__()
 
         # TODO: independent fallback mechanism
-        return backend.fallback.dot(left, right)
+        return _backend.fallback.dot(left, right)
 
     def __array_function__(self, func, types, args, kwargs):
         if func.__name__ == "dot":
@@ -183,11 +186,11 @@ FUNCS = {
 }
 
 ufunc_lookup = {
-    "matmul": backend.np.matmul,
-    "add": backend.np.add,
-    "multiply": backend.np.multiply,
-    "subtract": backend.np.subtract,
-    "true_divide": backend.np.true_divide,
+    "matmul": _backend.np.matmul,
+    "add": _backend.np.add,
+    "multiply": _backend.np.multiply,
+    "subtract": _backend.np.subtract,
+    "true_divide": _backend.np.true_divide,
 }
 
 
@@ -420,12 +423,11 @@ def calc_type(node1: NumpyEx, node2: NumpyEx) -> np.dtype:
 
 
 def arg_to_numpy_ex(arg: Any) -> NumpyEx:
-    import cupy
     if isinstance(arg, DelayArray):
         return arg
     elif isinstance(arg, Number):
         return Scalar(arg)
-    elif isinstance(arg, cupy.core.core.ndarray) or isinstance(arg, np.ndarray):
+    elif _backend.is_ndarray(arg):
         return NPArray(arg)
     else:
         print(type(arg))
@@ -463,62 +465,62 @@ def diagflat(arr, k=0):
 
 @implements(np.var)
 def var(arr, *args, **kwargs):
-    return backend.fallback.var(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.var(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.sum)
 def sum(arr, *args, **kwargs):
-    return backend.fallback.sum(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.sum(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.transpose)
 @cast
 def transpose(arr, *args, **kwargs):
-    return backend.fallback.transpose(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.transpose(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.roll)
 @cast
 def roll(arr, *args, **kwargs):
-    return backend.fallback.roll(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.roll(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.max)
 def max(arr, *args, **kwargs):
-    return backend.fallback.max(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.max(arr.__array__(), *args, **kwargs)
 
 
 @cast
 @implements(np.maximum)
 def maximum(arr, *args, **kwargs):
-    return backend.fallback.maximum(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.maximum(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.average)
 def average(arr, *args, **kwargs):
-    return backend.fallback.average(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.average(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.repeat)
 @cast
 def repeat(arr, *args, **kwargs):
-    return backend.fallback.repeat(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.repeat(arr.__array__(), *args, **kwargs)
 
 
 @cast
 @implements(np.cumsum)
 def cumsum(arr, *args, **kwargs):
-    return backend.fallback.cumsum(arr.__array__(), *args, **kwargs)
+    return _backend.fallback.cumsum(arr.__array__(), *args, **kwargs)
 
 
 @implements(np.greater)
 def greater(arr1, arr2, *args, **kwargs):
-    return backend.fallback.greater(arr1.__array__(), arr2, *args, **kwargs)
+    return _backend.fallback.greater(arr1.__array__(), arr2, *args, **kwargs)
 
 
 @implements(np.less)
 def less(arr1, arr2, *args, **kwargs):
-    return backend.fallback.less(arr1.__array__(), arr2, *args, **kwargs)
+    return _backend.fallback.less(arr1.__array__(), arr2, *args, **kwargs)
 
 
 add = np.add
@@ -538,7 +540,7 @@ power = np.power
 sqrt = np.sqrt
 square = np.square
 abs = np.abs
-newaxis = backend.fallback.newaxis
+newaxis = _backend.fallback.newaxis
 
 # dtypes etc.
 double = np.double
@@ -546,16 +548,16 @@ float32 = np.float32
 uint32 = np.uint32
 
 # Ones and zeros
-empty = cast(backend.fallback.empty)
-empty_like = cast(backend.fallback.empty_like)
-eye = cast(backend.fallback.eye)
-identity = cast(backend.fallback.identity)
-ones = cast(backend.fallback.ones)
-ones_like = cast(backend.fallback.ones_like)
-zeros = cast(backend.fallback.zeros)
-zeros_like = cast(backend.fallback.zeros_like)
-full = cast(backend.fallback.full)
-full_like = cast(backend.fallback.full_like)
+empty = cast(_backend.fallback.empty)
+empty_like = cast(_backend.fallback.empty_like)
+eye = cast(_backend.fallback.eye)
+identity = cast(_backend.fallback.identity)
+ones = cast(_backend.fallback.ones)
+ones_like = cast(_backend.fallback.ones_like)
+zeros = cast(_backend.fallback.zeros)
+zeros_like = cast(_backend.fallback.zeros_like)
+full = cast(_backend.fallback.full)
+full_like = cast(_backend.fallback.full_like)
 
 
 @implements(np.tile)
@@ -565,17 +567,17 @@ def tile(arr, *args, **kwargs):
     if isinstance(arr, DelayArray):
         temp = np.array(arr.__array__().get())
         print(type(temp))
-    return backend.fallback.tile(temp, *args, **kwargs)
+    return _backend.fallback.tile(temp, *args, **kwargs)
 
 
 # From existing data
 
-array = cast(backend.fallback.array)
-asarray = cast(backend.fallback.asarray)
-asanyarray = cast(backend.fallback.asanyarray)
-ascontiguousarray = cast(backend.fallback.ascontiguousarray)
+array = cast(_backend.fallback.array)
+asarray = cast(_backend.fallback.asarray)
+asanyarray = cast(_backend.fallback.asanyarray)
+ascontiguousarray = cast(_backend.fallback.ascontiguousarray)
 asmatrix = cast(np.asmatrix)
-copy = cast(backend.fallback.copy)
+copy = cast(_backend.fallback.copy)
 frombuffer = cast(np.frombuffer)
 fromfile = cast(np.fromfile)
 fromfunction = cast(np.fromfunction)
@@ -584,14 +586,14 @@ fromstring = cast(np.fromstring)
 loadtxt = cast(np.loadtxt)
 
 # Numerical ranges
-arange = cast(backend.fallback.arange)
-linspace = cast(backend.fallback.linspace)
-logspace = cast(backend.fallback.logspace)
+arange = cast(_backend.fallback.arange)
+linspace = cast(_backend.fallback.linspace)
+logspace = cast(_backend.fallback.logspace)
 geomspace = cast(np.geomspace)
 
 
 # Building matrices
-tri = cast(backend.fallback.tri)
-tril = cast(backend.fallback.tril)
-triu = cast(backend.fallback.triu)
+tri = cast(_backend.fallback.tri)
+tril = cast(_backend.fallback.tril)
+triu = cast(_backend.fallback.triu)
 vander = cast(np.vander)

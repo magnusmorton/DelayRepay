@@ -4,6 +4,11 @@ from .visitor import Visitor
 np = numpy
 fallback = numpy
 
+
+def is_ndarray(arr):
+    return isinstance(arr, numpy.ndarray)
+
+
 class CpuVisitor(Visitor):
     def visit_NPArray(self, node):
         return node.array

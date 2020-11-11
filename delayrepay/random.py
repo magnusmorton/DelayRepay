@@ -13,14 +13,14 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 """
 # Copyright (C) 2020 by University of Edinburgh
-
-import cupy.random
+import delayrepay.backend as be
 #from numpy.random import *
 from .delayarray import cast
+np = be.backend.np
 
-rand = cast(cupy.random.rand)
-randn = cast(cupy.random.randn)
-random = cast(cupy.random.random)
-seed = cupy.random.seed
-randint = cast(cupy.random.randint)
-choice = cast(cupy.random.choice)
+rand = cast(np.random.rand)
+randn = cast(np.random.randn)
+random = cast(np.random.random)
+seed = np.random.seed
+randint = cast(np.random.randint)
+choice = cast(np.random.choice)
