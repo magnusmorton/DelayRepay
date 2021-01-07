@@ -6,8 +6,10 @@ import numpy.testing as npt
 
 SIZE = 64
 
+
 def assertEqF(one, two):
     return abs(one-two) < 0.001
+
 
 class TestElwise(unittest.TestCase):
     # pylint: disable=C
@@ -152,13 +154,13 @@ class TestMeta(unittest.TestCase):
         self.assertIsNot(arr, arr2)
 
     def test_memo_ex(self):
-       arr = array([1, 2, 3])
-       ex1 = np.sin(arr)
-       print(id(ex1))
-       ex2 = np.sin(arr)
-       print(id(ex2))
-       self.assertIs(ex1, ex2)
+        arr = array([1, 2, 3])
+        ex1 = np.sin(arr)
+        print(id(ex1))
+        ex2 = np.sin(arr)
+        print(id(ex2))
+        self.assertIs(ex1, ex2)
 
-    
+
 if __name__ == '__main__':
     unittest.main()
