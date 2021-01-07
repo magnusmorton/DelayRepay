@@ -1,5 +1,11 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Any
+import numpy
+from .visitor import Visitor
+
+
+np = numpy
+fallback = numpy
 
 
 @dataclass
@@ -46,11 +52,16 @@ class Var(Atom):
     '''Not functions/classes'''
     val: str
 
+    def pp(self):
+        return self.val
 
 @dataclass
 class Number(Atom):
     '''Numbers'''
     val: float
+
+    def pp(self):
+        return str(self.val)
 
 
 @dataclass
@@ -81,6 +92,7 @@ class Unary(LiftNode):
 @dataclass
 class Binary(LiftNode):
     '''Binary Function'''
+    func: str
     left: LiftNode
     right: LiftNode
 
@@ -94,10 +106,21 @@ class Compose(Binary):
 class Apply(Binary):
     '''Function application ($)'''
 
+@dataclass
+class Lambda(LiftNode):
+    '''A scala lambda'''
+    args: List[Var]
+    body: LiftNode
+
 
 @dataclass
 class Map(Unary):
     '''Map base class'''
+    fun: Lambda
+    # arr: Any
+
+    def pp(self):
+        print(f"Map({self.fun.pp()})")
 
 @dataclass
 class MapWrg(Map):
@@ -135,11 +158,6 @@ class Array(LiftNode):
     members: List[String]
 
 
-@dataclass
-class Lambda(LiftNode):
-    '''A scala lambda'''
-    args: List[Var]
-    body: LiftNode
 
 
 @dataclass
@@ -157,3 +175,31 @@ class LiftFunction:
     '''A lift fun...'''
     types: List[LiftType]
     body: LiftNode
+
+
+def new_var():
+    new_var.counter += 1
+    return Var("x%d" % new_var.counter)
+
+
+new_var.counter = 0
+
+
+class LiftVisitor(Visitor):
+    def visit_NPArray(self, node):
+        return new_var()
+
+    def visit_Scalar(self, node):
+        return Number(node.val)
+
+    def visit_BinaryNumpyEx(self, node):
+        children = self.visit(node.children)
+        print(children)
+        body = Map(Lambda(new_var(),
+                          Binary(node.func.__name__, *children)))
+        return body
+
+
+def run(ex):
+    visitor = LiftVisitor()
+    return visitor.visit(ex).pp()
