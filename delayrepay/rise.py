@@ -64,11 +64,35 @@ class Lambda(Expression):
     body: Expression
 
     def print(self):
-        return "fun(%s = %s)" % (self.x.print(), self.body.print())
+        return "fun(%s => %s)" % (self.x.print(), self.body.print())
+
+
+@dataclass
+class TypedLambda(Expression):
+    x: Identifier
+    body: Expression
+    typ: str
+
+    def print(self):
+        return f"fun({self.typ})({self.x.print()} => {self.body.print()})"
+
+
+@dataclass
+class DepFun(Lambda):
+
+    def print(self):
+        return f"depFun(({self.x}) => {self.body.print()}"
 
 
 def fun(x, body):
     return Lambda(x, body)
+
+
+def typedfun(x, body, typ):
+    pass
+
+def depFun(typ, body):
+    return NotImplemented
 
 
 @dataclass
@@ -159,9 +183,23 @@ class RISETransformer(Visitor):
 
 
 class ShineTransformer(Visitor):
+
+    def walk(self, node):
+        rise_ex = self.visit(node)
+        funed = DepFun('n: Nat', TypedLambda(var('xs'), rise_ex, 'n`.`f32'))
+        return funed
+
     def visit_BinaryNumpyEx(self, node):
         from .delayarray import Scalar
 
+        # if both are scalar
+        return fun(x, bin_op(node.to_op(), lhs, rhs))
+        # if one is scalar
+        return Map(fun(x, bin_op(node.to_op(), x, lhs)), rhs)
+
+        # if both are tensors, zip
+        return map(fun(x, bin_op(node.to_op(), fst(x), snd(x))), Zip(lhs, rhs))
+        
         if isinstance(node.children[0], Scalar):
             lhs = generate(fun(new_var(), l(node.children[0].val)))
         else:
@@ -171,7 +209,7 @@ class ShineTransformer(Visitor):
         else:
             rhs = self.visit(node.children[1])
         x = new_var()
-        return map(fun(x, bin_op(node.to_op(), fst(x), snd(x))), zip(lhs, rhs))
+
 
     def visit_NPArray(self, node):
         return var("xs")
@@ -182,7 +220,7 @@ class ShineTransformer(Visitor):
 
 def to_rise(numpy_ex):
     transformer = ShineTransformer()
-    rise_ex = transformer.visit(numpy_ex)
+    rise_ex = transformer.walk(numpy_ex)
     return rise_ex.print()
 
 
