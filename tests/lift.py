@@ -14,3 +14,11 @@ class TestLift(unittest.TestCase):
     def test_pp(self):
         arr = dr.ones(32)
         print(arr * 3)
+
+    def test_axpy_pp(self):
+        arr = dr.ones(32)
+        print(arr*3 + 2)
+
+
+if __name__ == '__main__':
+    unittest.main()
