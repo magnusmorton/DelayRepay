@@ -39,8 +39,14 @@ def cast(func):
 
 
 class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
+
+    count = 0
+
     def __init__(self, *args, **kwargs):
         self._memo = None
+        self._count = self.count
+        self.count += 1
+        self._inputs = {}
 
     def __repr__(self):
         return str(self.__array__())
@@ -155,6 +161,16 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def repeat(self, *args, **kwargs):
         return repeat(self, *args, **kwargs)
 
+    # delayrepay CG stuff
+
+    @property
+    def name(self):
+        return f"arr{self._count}"
+
+    @property
+    def inputs(self):
+        return {self.name: self}
+
 
 Shape = Tuple[int, int]
 
@@ -251,6 +267,18 @@ class NumpyEx(DelayArray, metaclass=Memoiser):
         """
         return id(self)
 
+    @property
+    def inputs(self):
+        ret = {}
+        for child in self.children:
+            ret.update(child.inputs)
+        return ret
+
+    @property
+    def name(self):
+        assert(False, "should not be called")
+        return f"numex{self.count}"
+
 
 class Funcable:
     def to_op(self):
@@ -266,6 +294,10 @@ class ReduceEx(NumpyEx, Funcable):
     # func: np.ufunc
     # arg: NumpyEx
 
+    @property
+    def name(self):
+        return f"redex{self.count}"
+
 
 class UnaryFuncEx(NumpyEx, Funcable):
     def __init__(self, func, arg):
@@ -277,6 +309,10 @@ class UnaryFuncEx(NumpyEx, Funcable):
     def to_op(self):
         return FUNCS[self.func.__name__]
 
+    @property
+    def name(self):
+        return f"unfunc{self.count}"
+
 
 class BinaryFuncEx(NumpyEx):
     def __init__(self, func, left, right):
@@ -287,6 +323,10 @@ class BinaryFuncEx(NumpyEx):
 
     def to_op(self):
         return FUNCS[self.func.__name__]
+
+    @property
+    def name(self):
+        return f"binfun{self.count}"
 
 
 def pow_ex(func, left, right):
@@ -320,6 +360,10 @@ class BinaryNumpyEx(NumpyEx, Funcable):
         self.func = func
         self.shape = calc_shape(left.shape, right.shape, func)
         self.dtype = calc_type(left, right)
+
+    @property
+    def name(self):
+        return f"binex{self.count}"
 
 
 class MMEx(NumpyEx, Funcable):
@@ -379,6 +423,15 @@ class NPArray(NumpyEx):
         return self
 
 
+    @property
+    def name(self):
+        return f"arr{self.count}"
+
+    @property
+    def inputs(self):
+        return {self.name: self}
+
+
 class NPRef(NumpyEx):
     """Only for when breaking dependency chains for fusion"""
 
@@ -405,6 +458,13 @@ class Scalar(NumpyEx):
     def __hash__(self):
         return hash(self.val)
 
+    @property
+    def name(self):
+        return str(self.val)
+
+    @property
+    def inputs(self):
+        return {}
 
 def is_matrix_matrix(left, right):
     return len(left) > 1 and len(right) > 1
