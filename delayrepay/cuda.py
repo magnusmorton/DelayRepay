@@ -81,6 +81,18 @@ class Fragment(BaseFragment):
         return kern
 
 
+def make_kernel(inputs, body, name):
+    body = ";\n".join(dedup(body))
+    print(body)
+    inargs = [f"T {arg}" for arg in inputs]
+    return cupy.ElementwiseKernel(
+        ",".join(inargs),
+        "T out",
+        f"{body};\nout = {name}",
+        f"delay_repay_{name}",
+    )
+
+
 class InputFragment(BaseFragment):
     def __init__(self, name, arr) -> None:
         super().__init__()
@@ -187,7 +199,62 @@ class CupyEmitter(Visitor):
         return NotImplemented
 
 
-def run(ex) -> cupy.array:
+class NuCupyEmitter(Visitor):
+    def __init__(self):
+        super().__init__()
+        self.ins = {}
+        self.outs = []
+        self.kernels = []
+        self.seen = {}
+        self.count = 0
+
+    def visit(self, node):
+        if node in self.seen:
+            visited = self.seen[node]
+        else:
+            visited = super().visit(node)
+            self.seen[node] = visited
+            self.count += 1
+        return visited
+
+    def visit_BinaryNumpyEx(self, node):
+        op = node.to_op()
+        lname, lbody = self.visit(node.children[0])
+        rname, rbody = self.visit(node.children[1])
+        name = node.name
+        stmt = f"T {name} = {lname} {op} {rname}"
+        body = lbody + rbody + [stmt]
+        return (name, body)
+
+    def visit_UnaryFuncEx(self, node):
+        inname, inbody = self.visit(node.children[0])
+        name = node.name
+        body = inbody + [f"T {name} = {node.to_op()}({inname})"]
+        return (name, body)
+
+    def visit_BinaryFuncEx(self, node):
+        op = node.to_op()
+        lname, lbody = self.visit(node.children[0])
+        rname, rbody = self.visit(node.children[1])
+        name = node.name
+        stmt = f"T {name} = {op}({lname}, {rname})"
+        body = lbody + rbody + [stmt]
+        return (name, body)
+
+    def visit_NPArray(self, node):
+        return (node.name, [])
+
+    def visit_NPRef(self, node):
+        return NotImplemented
+
+    def visit_Scalar(self, node):
+        return (node.name, [])
+
+    def visit_ReduceEx(self, node):
+        return NotImplemented
+
+
+def oldrun(ex) -> cupy.array:
     visitor = CupyEmitter()
     kerns = [visitor.visit(ex)]
     for kern in kerns:
@@ -196,3 +263,11 @@ def run(ex) -> cupy.array:
         ret = compiled(*inputs)
         kern.array = ret
     return ret
+
+
+def run(ex) -> cupy.array:
+    visitor = NuCupyEmitter()
+    body = visitor.visit(ex)[1]
+    kern = make_kernel(ex.inputs, body, ex.name)
+    inputs = [value.array for value in ex.inputs.values()]
+    return kern(*inputs)

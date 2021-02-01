@@ -44,8 +44,8 @@ class DelayArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def __init__(self, *args, **kwargs):
         self._memo = None
-        self._count = self.count
-        self.count += 1
+        self._count = DelayArray.count
+        DelayArray.count += 1
         self._inputs = {}
 
     def __repr__(self):
@@ -296,7 +296,7 @@ class ReduceEx(NumpyEx, Funcable):
 
     @property
     def name(self):
-        return f"redex{self.count}"
+        return f"redex{self._count}"
 
 
 class UnaryFuncEx(NumpyEx, Funcable):
@@ -311,7 +311,7 @@ class UnaryFuncEx(NumpyEx, Funcable):
 
     @property
     def name(self):
-        return f"unfunc{self.count}"
+        return f"unfunc{self._count}"
 
 
 class BinaryFuncEx(NumpyEx):
@@ -326,7 +326,7 @@ class BinaryFuncEx(NumpyEx):
 
     @property
     def name(self):
-        return f"binfun{self.count}"
+        return f"binfun{self._count}"
 
 
 def pow_ex(func, left, right):
@@ -363,7 +363,7 @@ class BinaryNumpyEx(NumpyEx, Funcable):
 
     @property
     def name(self):
-        return f"binex{self.count}"
+        return f"binex{self._count}"
 
 
 class MMEx(NumpyEx, Funcable):
@@ -425,7 +425,7 @@ class NPArray(NumpyEx):
 
     @property
     def name(self):
-        return f"arr{self.count}"
+        return f"arr{self._count}"
 
     @property
     def inputs(self):
