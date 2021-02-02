@@ -1,5 +1,5 @@
 from typing import Any
-
+from functools import lru_cache
 
 class Visitor:
     """Visitor ABC"""
@@ -9,12 +9,17 @@ class Visitor:
         if isinstance(node, list):
             visitor = self.list_visit
         else:
-            method = "visit_" + node.__class__.__name__
-            visitor = getattr(self, method, self.default_visit)
+            visitor = self.single_visit
         return visitor(node)
 
     def list_visit(self, lst, **kwargs):
         return [self.visit(node) for node in lst]
+
+    @lru_cache(maxsize=None)
+    def single_visit(self, node):
+        method = "visit_" + node.__class__.__name__
+        visitor = getattr(self, method, self.default_visit)
+        return visitor(node)
 
     def default_visit(self, node):
         return node

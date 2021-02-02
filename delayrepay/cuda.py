@@ -52,19 +52,9 @@ class CupyEmitter(Visitor):
         self.seen = {}
         self.count = 0
 
-    def visit(self, node):
-        if node in self.seen:
-            visited = self.seen[node]
-        else:
-            visited = super().visit(node)
-            self.seen[node] = visited
-            self.count += 1
-        return visited
-
     def visit_BinaryNumpyEx(self, node):
         op = node.to_op()
-        lname, lbody = self.visit(node.children[0])
-        rname, rbody = self.visit(node.children[1])
+        (lname, lbody), (rname, rbody) = self.visit(node.children)
         name = node.name
         stmt = f"T {name} = {lname} {op} {rname}"
         body = lbody + rbody + [stmt]
