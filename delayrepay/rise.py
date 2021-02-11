@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
 import numpy
-from .visitor import Visitor
 
+
+from .visitor import Visitor
 
 np = numpy
 fallback = numpy
@@ -44,18 +45,18 @@ new_var.counter = 0
 @dataclass
 class TupleAccess(Expression):
     expr: Expression
-    access: str
+    pos: int
 
     def print(self):
         return "%s.%s" % (self.expr.print(), self.access)
 
 
 def fst(x):
-    return TupleAccess(x, "_1")
+    return TupleAccess(x, 1)
 
 
 def snd(x):
-    return TupleAccess(x, "_2")
+    return TupleAccess(x, 2)
 
 
 @dataclass
@@ -65,6 +66,10 @@ class Lambda(Expression):
 
     def print(self):
         return "fun(%s => %s)" % (self.x.print(), self.body.print())
+
+    @property
+    def children(self):
+        return [self.x, self.body]
 
 
 @dataclass
@@ -79,7 +84,7 @@ class TypedLambda(Expression):
 
 @dataclass
 class DepFun(Lambda):
-
+    
     def print(self):
         return f"depFun(({self.x}) => {self.body.print()}"
 
@@ -90,6 +95,7 @@ def fun(x, body):
 
 def typedfun(x, body, typ):
     pass
+
 
 def depFun(typ, body):
     return NotImplemented
@@ -182,46 +188,95 @@ class RISETransformer(Visitor):
         return l(node.val)
 
 
+class DelayException(Exception):
+    pass
+
+
 class ShineTransformer(Visitor):
 
     def walk(self, node):
         rise_ex = self.visit(node)
+        print(type(rise_ex))
         funed = DepFun('n: Nat', TypedLambda(var('xs'), rise_ex, 'n`.`f32'))
         return funed
 
     def visit_BinaryNumpyEx(self, node):
-        from .delayarray import Scalar
+        from .delayarray import Scalar, NPArray
+        left, right = self.visit(node.children)
 
-        # if both are scalar
-        return fun(x, bin_op(node.to_op(), lhs, rhs))
-        # if one is scalar
-        return Map(fun(x, bin_op(node.to_op(), x, lhs)), rhs)
-
-        # if both are tensors, zip
-        return map(fun(x, bin_op(node.to_op(), fst(x), snd(x))), Zip(lhs, rhs))
-        
-        if isinstance(node.children[0], Scalar):
-            lhs = generate(fun(new_var(), l(node.children[0].val)))
+        # TODO use BinaryNumpyEx over BinaryExpression. Make Var part of NumpyEx?
+        if isinstance(left, Scalar):
+            if isinstance(right, Scalar):
+                # if both are scalar
+                raise DelayException("should not happen")
+            else:
+                # if one is scalar
+                x = new_var()
+                return Map(Lambda(x, BinaryExpression(node.to_op(), x, left)),
+                           right)
         else:
-            lhs = self.visit(node.children[0])
-        if isinstance(node.children[1], Scalar):
-            rhs = generate(fun(new_var(), l(node.children[1].val)))
-        else:
-            rhs = self.visit(node.children[1])
-        x = new_var()
+            x = new_var()
+            if isinstance(right, Scalar):
+                # if one is scalar
+                return Map(Lambda(x, BinaryExpression(node.to_op(), x, right)),
+                           left)
+            else:
+                # both are tensors
+                return Map(Lambda(x, BinaryExpression(node.to_op(),
+                                                      fst(x),
+                                                      snd(x))),
+                           Zip(left, right))
 
 
-    def visit_NPArray(self, node):
-        return var("xs")
+class ShineEmitter(Visitor):
 
     def visit_Scalar(self, node):
-        return l(node.val)
+        return node.val
+
+    def visit_BinaryExpression(self, node):
+        lhs = self.visit(node.lhs)
+        rhs = self.visit(node.rhs)
+        return f"{lhs} {node.op} {rhs}"
+
+    def visit_Lambda(self, node):
+        x = self.visit(node.x)
+        body = self.visit(node.body)
+        return f"fun({x} => {body})"
+
+    def visit_Map(self, node):
+        f = self.visit(node.f)
+        xs = self.visit(node.xs)
+        return f"map({f})({xs})"
+
+    def visit_Zip(self, node):
+        lhs = self.visit(node.lhs)
+        rhs = self.visit(node.rhs)
+        return f"zip({lhs}, {rhs})"
+
+    def visit_TupleAccess(self, node):
+        expr = self.visit(node.expr)
+        return f"{expr}._{node.pos}"
+
+    def visit_TypedLambda(self, node):
+        x = self.visit(node.x)
+        body = self.visit(node.body)
+        return f"fun({node.typ})({x} => {body})"
+
+    def visit_DepFun(self, node):
+        body = self.visit(node.body)
+        return f"depFun(({node.x}) => {body})"
+
+    def visit_Identifier(self, node):
+        return node.name
+
 
 
 def to_rise(numpy_ex):
     transformer = ShineTransformer()
+    emitter = ShineEmitter()
     rise_ex = transformer.walk(numpy_ex)
-    return rise_ex.print()
+    rise_str = emitter.visit(rise_ex)
+    return rise_str
 
 
 run = to_rise
