@@ -15,7 +15,6 @@ class Visitor:
     def list_visit(self, lst, **kwargs):
         return [self.visit(node) for node in lst]
 
-    @lru_cache(maxsize=None)
     def single_visit(self, node):
         method = "visit_" + node.__class__.__name__
         visitor = getattr(self, method, self.default_visit)
@@ -50,4 +49,5 @@ class PrettyPrinter(Visitor):
         if isinstance(node, list):
             return self.list_visit(node)
         print(type(node).__name__)
-        self.visit(node.children)
+        if hasattr(node, 'children'):
+            return self.visit(node.children)
