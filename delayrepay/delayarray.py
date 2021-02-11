@@ -355,6 +355,7 @@ def create_ex(func, args):
 class BinaryNumpyEx(NumpyEx, Funcable):
     """Binary numpy expression"""
 
+    # TODO make properties for shape and dtype
     def __init__(self, func, left, right):
         super().__init__(children=[left, right])
         self.func = func
