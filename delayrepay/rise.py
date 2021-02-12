@@ -196,7 +196,6 @@ class ShineTransformer(Visitor):
 
     def walk(self, node):
         rise_ex = self.visit(node)
-        print(type(rise_ex))
         funed = DepFun('n: Nat', TypedLambda(var('xs'), rise_ex, 'n`.`f32'))
         return funed
 
@@ -226,6 +225,21 @@ class ShineTransformer(Visitor):
                                                       fst(x),
                                                       snd(x))),
                            Zip(left, right))
+
+    def visit_NPArray(self, node):
+        return var(node.name)
+
+
+def lambdaify(rise_ex, inputs):
+    name = inputs[0]
+    if len(inputs) > 1:
+        return TypedLambda(var(name), lambdaify(rise_ex, inputs[1:]), 'n`.`f32')
+    else:
+        return TypedLambda(var(name), rise_ex, 'n`.`f32')
+
+
+def depfunify(rise_ex, typevars=[]):
+    return DepFun('n: Nat', rise_ex)
 
 
 class ShineEmitter(Visitor):
@@ -270,11 +284,11 @@ class ShineEmitter(Visitor):
         return node.name
 
 
-
 def to_rise(numpy_ex):
     transformer = ShineTransformer()
     emitter = ShineEmitter()
-    rise_ex = transformer.walk(numpy_ex)
+    rise_ex = depfunify(lambdaify(transformer.visit(numpy_ex),
+                        list(numpy_ex.inputs.keys())))
     rise_str = emitter.visit(rise_ex)
     return rise_str
 
