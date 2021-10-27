@@ -1,2 +1,7 @@
 *.pyc
 *~
+.mypy_cache
+build
+results
+*.egg-info
+dist
